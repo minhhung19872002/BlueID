@@ -254,6 +254,11 @@ thử — điều mà chính bộ kiểm thử OpenID coi là tuỳ chọn của
 - Giới hạn trang đăng nhập 300 POST/phút/IP (`BID_SIGNIN_IP_LIMIT_PER_MINUTE`, BUG-012); chống dò chính là khoá mềm theo
   tài khoản (D12).
 
+**Còn thiếu so với hợp đồng (làm ở Phase 5, phase sự kiện):** phát hiện dùng lại refresh token đã thu hồi cả chuỗi, nhưng
+**chưa** phát sự kiện `user.sessions_revoked` (lý do `refresh_token_reuse`, docs/05 4); dùng lại tuần tự do OpenIddict bắt
+trước khi tới `OidcController`, nên cần một handler riêng. Chọn ES256 theo client và cổng loopback tuỳ ý của RFC 8252:
+Phase 6.
+
 ## D16. `client_secret_post` theo từng ứng dụng, mặc định tắt
 
 **Bối cảnh.** Hợp đồng 1.0 không có `client_secret_post`; hồ sơ chứng nhận Basic OP bắt buộc thử cả `client_secret_basic`
