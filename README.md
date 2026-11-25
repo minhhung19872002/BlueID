@@ -15,7 +15,14 @@ directory API.
 | 0 | Dev infrastructure, reference systems, integration contract 1.0 | ✅ done |
 | 1 | Foundation: solution, tenants, users, passwords, Razor sign-in, sessions, audit, i18n, React portal shell | ✅ done |
 | 2 | OAuth/OIDC core (OpenIddict), key rotation, logout (RP-initiated, back-channel), consent, sample product; OpenID conformance suite: 5 profiles, 0 failures | ✅ done |
-| 3 | MFA: TOTP, passkeys/WebAuthn, email codes, recovery codes, self-service reset, password policy | next |
+| 3 | MFA: TOTP, passkeys/WebAuthn, email codes, recovery codes, self-service reset, password policy | ⏸ paused, not started |
+
+**Paused on 2026-11-25 after Phase 2.** Resume with Phase 3 (PROMPT section 13). Open items carried forward:
+- Phase 5: event `user.sessions_revoked` (reason `refresh_token_reuse`) on refresh-token reuse (docs/00 D15).
+- Phase 6: ES256 signing per client; any loopback port for native apps (RFC 8252 7.3).
+- OBS-001 (docs/08): one unexplained mass failure of integration tests, not reproduced since.
+- Conformance REVIEW screenshots need a human review before an official OpenID certification (docs/07).
+- Tests at pause: 35 unit, 54 integration, 3 vitest — all green.
 
 ## Dev environment (Phase 0)
 
