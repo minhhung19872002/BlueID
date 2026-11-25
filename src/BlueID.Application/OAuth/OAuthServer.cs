@@ -63,18 +63,37 @@ public static class OAuthServer
             o.DisableResourceValidation();
             // Products read access tokens (RFC 9068 JWT, signed, not encrypted).
             o.DisableAccessTokenEncryption();
+            // Request objects (OIDC Core 6) are not supported. OpenIddict refuses them while validating, and errors raised
+            // while validating are never sent back to the client (the redirect URI counts as validated only afterwards).
+            // OIDC Core 6.1 wants request_not_supported at the client: OidcController refuses them instead (BUG-014).
+            o.RemoveEventHandler(OpenIddict.Server.OpenIddictServerHandlers.Authentication.ValidateRequestParameter.Descriptor);
+            // docs/00 D16: client_secret_post only for applications registered with it.
+            o.AddEventHandler<ProcessAuthenticationContext>(b => b.UseScopedHandler<ClientSecretPostGuard>()
+                .SetOrder(OpenIddict.Server.OpenIddictServerHandlers.ValidateAuthenticationDemand.Descriptor.Order + 1));
             o.AddEventHandler<HandleConfigurationRequestContext>(b => b.UseInlineHandler(ctx =>
             {
                 ctx.Metadata["backchannel_logout_supported"] = true;
                 ctx.Metadata["backchannel_logout_session_supported"] = true;
                 ctx.Metadata["acr_values_supported"] = System.Text.Json.JsonSerializer.SerializeToElement(new[] { TokenClaims.AcrSingleFactor, TokenClaims.AcrMultiFactor });
+                // Request objects are not supported: no algorithm at all (request_parameter_supported is false too).
+                ctx.Metadata["request_object_signing_alg_values_supported"] = System.Text.Json.JsonSerializer.SerializeToElement(Array.Empty<string>());
                 return default;
             }));
+            o.AddEventHandler<ApplyConfigurationResponseContext>(b => b.UseInlineHandler(ctx =>
+            {
+                // Not defined by RFC 9126 / RFC 8414 (the conformance suite flags it); OpenIddict adds it late, so it is
+                // removed from the response just before it is written.
+                ctx.Response.RemoveParameter("pushed_authorization_request_endpoint_auth_methods_supported");
+                return default;
+            }).SetOrder(int.MinValue + 100_000));
             var aspnet = o.UseAspNetCore()
                 .EnableAuthorizationEndpointPassthrough()
                 .EnableTokenEndpointPassthrough()
                 .EnableUserInfoEndpointPassthrough()
-                .EnableEndSessionEndpointPassthrough();
+                .EnableEndSessionEndpointPassthrough()
+                // OpenIddict decides whether an error can go back to the client; when it cannot (no valid redirect_uri,
+                // missing response_type...), it leaves the body empty and BlueID.Web shows its translated error page.
+                .EnableStatusCodePagesIntegration();
             if (plainHttpAllowed)
             {
                 aspnet.DisableTransportSecurityRequirement();
@@ -111,7 +130,6 @@ public static class OAuthServer
         public void PostConfigure(string? name, OpenIddictServerOptions options)
         {
             options.CodeChallengeMethods.Remove(CodeChallengeMethods.Plain);
-            options.ClientAuthenticationMethods.Remove(ClientAuthenticationMethods.ClientSecretPost);
             options.ClientAuthenticationMethods.Remove(ClientAuthenticationMethods.ClientSecretJwt);
             options.ResponseModes.Remove(ResponseModes.Fragment);
         }

@@ -60,6 +60,8 @@ public sealed class ClientApplication : Entity
     public string? BackchannelLogoutUri { get; set; }
     /// <summary>docs/00 D14: exempt from the PKCE requirement; only honoured when BID_CONFORMANCE_MODE=true.</summary>
     public bool ConformanceTestClient { get; set; }
+    /// <summary>docs/00 D16: client_secret_post accepted only when the application was registered for it (default off).</summary>
+    public bool AllowClientSecretPost { get; set; }
     public bool Enabled { get; set; } = true;
 }
 

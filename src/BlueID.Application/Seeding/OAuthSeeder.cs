@@ -93,14 +93,24 @@ public sealed class OAuthSeeder(BlueIdDbContext db, ApplicationRegistry registry
             await tx.CommitAsync(ct);
         }
 
-        for (var i = 1; i <= 2; i++)
+        // The suite's client_secret_post module needs a client registered for that method (docs/00 D16).
+        await registry.EnsureClientAsync(tenant.Id, new ClientDefinition(
+            "conformance-post", "OpenID conformance client (client_secret_post)", ApplicationKind.Confidential,
+            [suite + "/callback"], [suite + "/post_logout_redirect"], [GrantTypes.AuthorizationCode, GrantTypes.RefreshToken], [],
+            [.. ApplicationRegistry.OidcScopes], ClientSecret: config["BID_CONFORMANCE_CLIENT1_SECRET"], FirstParty: true,
+            ConformanceTestClient: true, AllowClientSecretPost: true), ct);
+
+        // Clients 1-2 for every plan; 3-4 (same secrets) register a back-channel logout URI, for that plan only: the other
+        // plans' test modules do not serve that path.
+        for (var i = 1; i <= 4; i++)
         {
-            var secret = config[$"BID_CONFORMANCE_CLIENT{i}_SECRET"] ?? throw new InvalidOperationException($"BID_CONFORMANCE_CLIENT{i}_SECRET is required in conformance mode.");
+            var secretNo = i <= 2 ? i : i - 2;
+            var secret = config[$"BID_CONFORMANCE_CLIENT{secretNo}_SECRET"] ?? throw new InvalidOperationException($"BID_CONFORMANCE_CLIENT{secretNo}_SECRET is required in conformance mode.");
             await registry.EnsureClientAsync(tenant.Id, new ClientDefinition(
                 $"conformance-{i}", $"OpenID conformance client {i}", ApplicationKind.Confidential,
                 [suite + "/callback"], [suite + "/post_logout_redirect"],
                 [GrantTypes.AuthorizationCode, GrantTypes.RefreshToken], [], [.. ApplicationRegistry.OidcScopes],
-                ClientSecret: secret, FirstParty: true, BackchannelLogoutUri: suite + "/backchannel_logout", ConformanceTestClient: true), ct);
+                ClientSecret: secret, FirstParty: true, BackchannelLogoutUri: i <= 2 ? null : suite + "/backchannel_logout", ConformanceTestClient: true), ct);
         }
     }
 }

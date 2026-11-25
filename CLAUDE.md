@@ -43,3 +43,23 @@ Integration contract: `docs/05-hop-dong-tich-hop.md` — any change to claims, e
   newlines). Write scripts to the scratchpad with the Write tool, or use Edit.
 - Production trial: `docker compose -p blueid-trial -f deploy/docker-compose.yml --env-file <trial.env> up -d` with
   `BID_HTTPS_PORT=58443`, then `python scripts/dev-smoke-login.py https://localhost:58443`; `down -v` and prune images after.
+
+
+## OAuth/OIDC (Phase 2)
+- OpenIddict 7.9 pass-through: `src/BlueID.Web/Controllers/OidcController.cs` decides; claims only via
+  `Application/OAuth/TokenClaims.cs` (= docs/05 5.3; a change there is a contract change). Server options:
+  `Application/OAuth/OAuthServer.cs`; register resources/clients only through `ApplicationRegistry` (apps.* + oauth.*).
+- Errors raised while OpenIddict *validates* are never redirected to the client (it marks the redirect URI validated only
+  afterwards); anything that must reach the client (e.g. request_not_supported) is refused in OidcController.
+- Single-use things go through `auth.used_tokens` (refresh token ids, client assertion jti). Signing keys: `KeyRing`
+  (rotation, change token → OpenIddict options). Master key purposes: signing-keys, openiddict-encryption, data-protection.
+- Back-channel logout: `BackchannelLogoutQueue` (call it wherever a session ends; `IDirectoryWriter` paths already do) and
+  `BackchannelLogoutSender` (tests call `RunOnceAsync`).
+- Conformance suite: `.cache/conformance-suite` (clone of tag release-v5.3.4) + `.cache/venv` (`python -m venv`, then
+  `pip install httpx pyparsing`); `sh scripts/conformance/run.sh <filter>`, `python scripts/conformance/summary.py <plan>`.
+  Its run-test-plan.py splits arguments on ":" — keep the config path relative (Windows drive letters). Restart
+  `dev-run.sh web` after code changes before a run. Pending logout deliveries from older runs can hit the suite: mark them
+  FAILED in the dev DB if a client's URI changed while the web was down.
+- Dev hosts: host-run processes map dev names through BID_DEV_HOSTS / SAMPLE_DEV_HOSTS (Development only); the browser
+  needs the hosts-file line from README (or Playwright `--host-resolver-rules`).
+- Never type `cat > file` without input in a shell command: it waits on stdin until the tool times out.

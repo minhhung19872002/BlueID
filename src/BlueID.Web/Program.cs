@@ -61,7 +61,13 @@ builder.Services.AddRateLimiter(o =>
 {
     o.AddPolicy(WebRateLimits.SignIn, http => RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = testing ? 10_000 : 30, Window = TimeSpan.FromMinutes(1) }));
+        // Per client IP, generous: whole offices sign in from one NAT address (BUG-012). Guessing is stopped by the
+        // per-account soft lockout (docs/00 D12), not by this.
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = testing ? 10_000 : int.TryParse(builder.Configuration["BID_SIGNIN_IP_LIMIT_PER_MINUTE"], out var perMinute) ? perMinute : 300,
+            Window = TimeSpan.FromMinutes(1),
+        }));
     o.OnRejected = (ctx, _) => new ValueTask(ApiResponses.WriteErrorAsync(ctx.HttpContext, HttpStatusCode.TooManyRequests, "rate_limited"));
 });
 
@@ -76,6 +82,20 @@ app.UseMiddleware<SecurityHeadersMiddleware>(
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; " +
     "form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'");
 app.UseMiddleware<InputFilterMiddleware>();
+// An OAuth error OpenIddict could not send back to the client (status code pages integration): show the person a
+// translated page with the error code instead of an empty 400.
+app.UseStatusCodePages(ctx =>
+{
+    // Only the browser-facing endpoints: APIs (token, userinfo, introspection…) keep their 4xx answers (BUG-015).
+    var endpoint = Microsoft.AspNetCore.OpenIddictServerAspNetCoreHelpers.GetOpenIddictServerEndpointType(ctx.HttpContext);
+    if (endpoint is OpenIddict.Server.OpenIddictServerEndpointType.Authorization or OpenIddict.Server.OpenIddictServerEndpointType.EndSession &&
+        Microsoft.AspNetCore.OpenIddictServerAspNetCoreHelpers.GetOpenIddictServerResponse(ctx.HttpContext) is { Error: { Length: > 0 } error })
+    {
+        ctx.HttpContext.Response.Redirect("/oauth-error?error=" + Uri.EscapeDataString(error));
+    }
+
+    return Task.CompletedTask;
+});
 app.UseStaticFiles();
 var portalRoot = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(AppContext.BaseDirectory, "wwwroot"), "portal");
 app.UseRequestLocalization(o =>

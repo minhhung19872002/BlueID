@@ -16,7 +16,7 @@
         <input id="UserName" name="UserName" type="email" value="@Model.UserName" autocomplete="username" autocapitalize="none" spellcheck="false"
                required autofocus aria-describedby="@(Model.ErrorKey is null ? "name-hint" : "login-error name-hint")">
         <p class="hint" id="name-hint">@T["login.user_name_hint"]</p>
-        <button type="submit">@T["login.next"]</button>
+        <button type="submit" id="login-next">@T["login.next"]</button>
     </form>
 }
 else
@@ -29,6 +29,6 @@ else
         <label for="Password">@T["login.password"]</label>
         <input id="Password" name="Password" type="password" autocomplete="current-password" required autofocus
                aria-describedby="@(Model.ErrorKey is null ? null : "login-error")">
-        <button type="submit">@T["login.sign_in"]</button>
+        <button type="submit" id="login-submit">@T["login.sign_in"]</button>
     </form>
 }

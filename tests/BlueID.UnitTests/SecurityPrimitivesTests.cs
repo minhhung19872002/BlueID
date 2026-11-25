@@ -211,3 +211,41 @@ public sealed class LicenceListTests
         }
     }
 }
+
+public sealed class MasterKeyTests
+{
+    private static readonly BlueID.Infrastructure.Security.MasterKey Key = new(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+
+    [Fact]
+    public void Encrypts_per_purpose_and_detects_tampering()
+    {
+        var data = Key.Encrypt("signing-keys", "secret key bytes"u8);
+        System.Text.Encoding.UTF8.GetString(Key.Decrypt("signing-keys", data)).Should().Be("secret key bytes");
+        // Another purpose (another derived key and associated data) cannot read it.
+        var wrongPurpose = () => Key.Decrypt("totp", data);
+        wrongPurpose.Should().Throw<System.Security.Cryptography.CryptographicException>();
+        data[^1] ^= 1;
+        var tampered = () => Key.Decrypt("signing-keys", data);
+        tampered.Should().Throw<System.Security.Cryptography.CryptographicException>();
+    }
+
+    [Fact]
+    public void Data_protection_keys_round_trip_and_are_not_plain_text()
+    {
+        var element = new System.Xml.Linq.XElement("key", new System.Xml.Linq.XElement("masterKey", "AAAA-very-secret"));
+        var info = new BlueID.Infrastructure.Security.MasterKeyXmlEncryptor(Key).Encrypt(element);
+        info.EncryptedElement.ToString().Should().NotContain("very-secret");
+        var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+        Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions.AddSingleton(services, Key);
+        var back = new BlueID.Infrastructure.Security.MasterKeyXmlDecryptor(Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(services))
+            .Decrypt(info.EncryptedElement);
+        back.ToString().Should().Be(element.ToString());
+    }
+
+    [Fact]
+    public void Master_key_must_be_32_bytes()
+    {
+        var act = () => new BlueID.Infrastructure.Security.MasterKey(new byte[16]);
+        act.Should().Throw<InvalidOperationException>();
+    }
+}

@@ -31,7 +31,8 @@ public sealed record ClientDefinition(
     bool MultiTenant = false,
     string? BackchannelLogoutUri = null,
     bool ConformanceTestClient = false,
-    bool RequirePar = false);
+    bool RequirePar = false,
+    bool AllowClientSecretPost = false);
 
 /// <summary>
 /// The one way to register resources and clients: BlueID's apps.* rows and OpenIddict's oauth.* rows are written in one
@@ -120,9 +121,17 @@ public sealed class ApplicationRegistry(
         row.Kind = d.Kind;
         row.FirstParty = d.FirstParty;
         row.MultiTenant = d.MultiTenant;
+        if (row.BackchannelLogoutUri != d.BackchannelLogoutUri)
+        {
+            // Pending logout tokens for the old URI are not retried against it any more (BUG-017).
+            await db.LogoutDeliveries.Where(x => x.ClientId == d.ClientId && x.Status == DeliveryStatus.Pending)
+                .ExecuteUpdateAsync(x => x.SetProperty(v => v.Status, DeliveryStatus.Failed).SetProperty(v => v.LastError, "backchannel_logout_uri changed"), ct);
+        }
+
         row.BackchannelLogoutUri = d.BackchannelLogoutUri;
         row.ConformanceTestClient = d.ConformanceTestClient;
         row.RequirePar = d.RequirePar;
+        row.AllowClientSecretPost = d.AllowClientSecretPost;
         row.Enabled = true;
 
         var descriptor = new OpenIddictApplicationDescriptor

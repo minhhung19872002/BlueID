@@ -23,7 +23,8 @@ public sealed class Phase2Tests(StackFixture stack)
         Strings(d, "response_types_supported").Should().Equal("code");
         Strings(d, "response_modes_supported").Should().BeEquivalentTo("query", "form_post");
         Strings(d, "grant_types_supported").Should().BeEquivalentTo("authorization_code", "refresh_token", "client_credentials");
-        Strings(d, "token_endpoint_auth_methods_supported").Should().NotContain(["client_secret_post", "client_secret_jwt"]).And.Contain("private_key_jwt");
+        // client_secret_post is listed but accepted only from applications registered for it (docs/00 D16, tested separately).
+        Strings(d, "token_endpoint_auth_methods_supported").Should().NotContain("client_secret_jwt").And.Contain(["private_key_jwt", "client_secret_basic"]);
         d.GetProperty("backchannel_logout_supported").GetBoolean().Should().BeTrue();
         d.GetProperty("end_session_endpoint").GetString().Should().EndWith("/connect/logout");
         // RFC 8414 metadata at its own well-known path, same content.

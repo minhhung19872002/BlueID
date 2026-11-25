@@ -14,7 +14,8 @@ directory API.
 |---|---|---|
 | 0 | Dev infrastructure, reference systems, integration contract 1.0 | ✅ done |
 | 1 | Foundation: solution, tenants, users, passwords, Razor sign-in, sessions, audit, i18n, React portal shell | ✅ done |
-| 2 | OAuth/OIDC core (OpenIddict), conformance suite | next |
+| 2 | OAuth/OIDC core (OpenIddict), key rotation, logout (RP-initiated, back-channel), consent, sample product; OpenID conformance suite: 5 profiles, 0 failures | ✅ done |
+| 3 | MFA: TOTP, passkeys/WebAuthn, email codes, recovery codes, self-service reset, password policy | next |
 
 ## Dev environment (Phase 0)
 
@@ -53,3 +54,12 @@ Open https://id.blue.test:54443/ (Caddy, internal CA). Sample accounts: `admin@a
 (must change at first sign-in). Tests: `dotnet test BlueID.slnx` (Docker needed), `cd web && npx vitest run`.
 
 Production: `deploy/docker-compose.yml` + `deploy/.env.example`; image `deploy/docker/blueid.Dockerfile`.
+
+## OAuth / OIDC (Phase 2)
+
+```sh
+sh scripts/dev-run.sh sample                     # sample product on https://sample.blue.test:54443 (after web)
+sh scripts/conformance/run.sh [plan-filter]      # OpenID conformance suite, 5 profiles (needs .cache, see CLAUDE.md)
+```
+
+Discovery: https://id.blue.test:54443/.well-known/openid-configuration · contract: `docs/05` (1.1).

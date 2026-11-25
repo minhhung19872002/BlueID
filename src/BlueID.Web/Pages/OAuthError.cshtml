@@ -1,0 +1,8 @@
+@page "/oauth-error"
+@model OAuthErrorModel
+@{
+    ViewData["Title"] = T["oauth_error.title"].Value;
+}
+<h1 id="page-title">@T["oauth_error.title"]</h1>
+<p>@T["oauth_error.text"]</p>
+<p class="hint">@T["oauth_error.code"] <code id="oauth-error-code">@Model.Code</code></p>

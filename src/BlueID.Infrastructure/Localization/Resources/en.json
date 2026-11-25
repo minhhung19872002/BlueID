@@ -70,5 +70,8 @@
   "error.scope_taken": "Another resource already uses this scope name.",
   "error.conformance_mode_off": "Conformance-suite clients exist only in conformance mode.",
   "error.redirect_uri_invalid": "Redirect URIs must be absolute, without wildcards or fragments.",
-  "error.grant_type_forbidden": "This grant type is not allowed."
+  "error.grant_type_forbidden": "This grant type is not allowed.",
+  "oauth_error.title": "Sign-in request not valid",
+  "oauth_error.text": "The application that sent you here made a request BlueID cannot accept. Go back to the application and try again; if it keeps happening, tell its administrator.",
+  "oauth_error.code": "Error code:"
 }

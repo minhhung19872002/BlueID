@@ -342,6 +342,10 @@ namespace BlueID.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("AllowClientSecretPost")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allow_client_secret_post");
+
                     b.Property<string>("BackchannelLogoutUri")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")

@@ -220,3 +220,56 @@ gửi PKCE. Bắt PKCE với máy khách của bộ kiểm thử thì gần như
 
 **Hệ quả.** Chứng nhận/đối chứng là của đúng mã và cấu hình chạy thật, chỉ khác yêu cầu PKCE của riêng máy khách kiểm
 thử — điều mà chính bộ kiểm thử OpenID coi là tuỳ chọn của OIDC. Ghi rõ trong `docs/07` cạnh kết quả chạy.
+
+## D15. Lõi OAuth/OIDC trên OpenIddict 7.9 (Phase 2)
+
+- **Chế độ passthrough**: OpenIddict kiểm giao thức (client, redirect URI khớp chính xác, PKCE, quyền theo grant/scope/
+  resource của client, mã một lần); `OidcController` quyết định người dùng là ai, thẻ ghi gì (`TokenClaims` = hợp đồng
+  docs/05 5.3) và có được cấp không (phiên còn sống, người dùng/tenant hoạt động, đồng ý, ứng dụng nhiều tenant).
+- **Chỉ bật đúng thứ hợp đồng có**: code + refresh + client credentials; PKCE chỉ `S256` và bắt buộc theo từng client
+  (`ft:pkce`, D14); bỏ `client_secret_jwt`, `fragment`; implicit/hybrid/password không bao giờ được bật.
+- **Resource Indicators**: tài nguyên nằm trong `apps.resources` (thêm lúc chạy) nên tắt kiểm resource tĩnh của OpenIddict
+  (`DisableResourceValidation`); `OidcController.ValidateTargetAsync` kiểm thay: tối đa một resource, resource phải có
+  thật, phạm vi phải thuộc đúng resource; quyền `rsrc:` của client vẫn do OpenIddict kiểm.
+- **Khoá ký** (`keys.signing_keys`): RSA 3072, khoá riêng mã hoá AES-256-GCM bằng khoá con HKDF của `BID_MASTER_KEY`.
+  Vòng đời NEXT → ACTIVE (sau 90 ngày và khi NEXT đã công bố ≥ 48 giờ) → RETIRING (91 ngày, vẫn trong JWKS và vẫn được
+  chấp nhận) → RETIRED (xoá khoá riêng). Mỗi nút nạp lại 30 giây/lần; tập khoá đổi thì change token của
+  `IOptionsMonitor<OpenIddictServerOptions>` kích hoạt, thẻ mới ký bằng khoá mới ngay, không khởi động lại (bài học 5;
+  phép thử `Key_rotation_reaches_tokens_and_jwks_without_a_restart`). Xoay chạy một nút mỗi lần (advisory lock).
+  ES256: hợp đồng cho phép, nhưng 1.x chỉ ký RS256 (chọn thuật toán theo client: Phase 6).
+- **Một lần là một lần** (bài học 1): `auth.used_tokens` (khoá chính `kind, value`) cho refresh token (`oi_tkn_id`) và
+  `client_id:jti` của client assertion. OpenIddict không nguyên tử ở cả hai (BUG-010, BUG-011). Bên thua khi đổi refresh
+  token bị coi là dùng lại: thu hồi cả authorization.
+- **Trần 90 ngày** của refresh token tính từ lúc đăng nhập (OpenIddict chỉ có trượt 14 ngày).
+- Thẻ người dùng gắn với **phiên BlueID**: mỗi lần đổi mã/làm mới hỏi lại `SessionService.ValidateAsync` (cũng gia hạn phiên),
+  nên đăng xuất/khoá/đổi mật khẩu làm refresh token chết ngay.
+- **Đăng xuất kênh sau**: `auth.session_clients` ghi ứng dụng nào đã nhận thẻ qua phiên nào; kết thúc phiên (mọi lối:
+  đăng xuất, quản trị thu hồi, khoá, đổi mật khẩu) xếp `auth.logout_deliveries` trong cùng giao dịch; bộ gửi lấy hàng bằng
+  `FOR UPDATE SKIP LOCKED`, thử lại 1 s → 10 phút trong 72 giờ; 4xx (trừ 408/429) dừng ngay; đổi/gỡ URI huỷ hàng chờ (BUG-017).
+- **Đăng xuất do ứng dụng khởi tạo**: chỉ chuyển hướng tới `post_logout_redirect_uri` khi `id_token_hint` hợp lệ (BUG-016).
+- **Trang lỗi OAuth**: lỗi mà OpenIddict không gửi về client được (redirect URI sai, thiếu `response_type`…) → trang
+  `/oauth-error` có dịch, chỉ hiện mã lỗi; chỉ cho endpoint authorize và end-session (BUG-015). Request object (OIDC Core 6)
+  không hỗ trợ: trả `request_not_supported` về client theo `response_mode` của yêu cầu (BUG-014).
+- Khoá Data Protection (cookie phiên) mã hoá khi lưu bằng khoá chủ (`MasterKeyXmlEncryptor`).
+- Giới hạn trang đăng nhập 300 POST/phút/IP (`BID_SIGNIN_IP_LIMIT_PER_MINUTE`, BUG-012); chống dò chính là khoá mềm theo
+  tài khoản (D12).
+
+## D16. `client_secret_post` theo từng ứng dụng, mặc định tắt
+
+**Bối cảnh.** Hợp đồng 1.0 không có `client_secret_post`; hồ sơ chứng nhận Basic OP bắt buộc thử cả `client_secret_basic`
+lẫn `client_secret_post` (`OIDCCBasicTestPlan.java`: "the certification profile requires that both basic and post are
+tested"). **Quyết định.** Bật phương thức ở máy chủ, nhưng `ClientSecretPostGuard` chỉ chấp nhận từ ứng dụng có
+`allow_client_secret_post = true` (mặc định `false`; mọi ứng dụng hiện có giữ nguyên hành vi, phép thử
+`Client_secret_post_and_wrong_secrets_are_refused`). Bộ kiểm thử dùng máy khách riêng `conformance-post`.
+**Hệ quả.** Hợp đồng 1.1 ghi đây là tuỳ chọn theo ứng dụng (chỉ thêm, không phá vỡ).
+
+## D14 (bổ sung Phase 2)
+
+Máy khách kiểm thử: `conformance-1/2` (mọi hồ sơ), `conformance-3/4` (có `backchannel_logout_uri`, chỉ cho hồ sơ
+Back-Channel Logout), `conformance-post` (D16). Ở chế độ tuân thủ, HttpClient gửi logout token chấp nhận chứng chỉ tự ký
+của bộ kiểm thử (chỉ khi `BID_CONFORMANCE_MODE=true`).
+
+## Bằng chứng Phase 2 (2026-11-25)
+
+Bộ kiểm thử tuân thủ OpenID `release-v5.3.4` chạy với BlueID dev (`sh scripts/conformance/run.sh`), kết quả chi tiết
+và lý do từng cảnh báo: `docs/07-giao-thuc.md` mục "Bộ kiểm thử tuân thủ OpenID". `dotnet test`: xem docs/06 Phase 2.

@@ -129,7 +129,7 @@ Phạm vi OIDC chuẩn: `openid`, `profile`, `email`, `offline_access` (cấp re
 | Token Exchange (RFC 8693) | Theo danh sách cho phép (mục 9) |
 | PAR (RFC 9126) | Tuỳ chọn; ứng dụng có `require_par` thì bắt buộc |
 | `response_mode`: `query`, `form_post` | |
-| Xác thực máy khách: `private_key_jwt` (RFC 7523, **bắt buộc cho sản phẩm Blue**), `client_secret_basic` | `client_secret_post` không hỗ trợ; `none` cho máy khách công khai (SPA, ứng dụng gốc) |
+| Xác thực máy khách: `private_key_jwt` (RFC 7523, **bắt buộc cho sản phẩm Blue**), `client_secret_basic` | `client_secret_post` chỉ cho ứng dụng được đăng ký riêng phương thức này (mặc định tắt, thêm ở 1.1); `client_secret_jwt` không hỗ trợ; `none` cho máy khách công khai (SPA, ứng dụng gốc) |
 | Ứng dụng gốc (RFC 8252): redirect loopback `http://127.0.0.1:{bất kỳ cổng}/path`, scheme riêng `com.example.app:/cb` | Cổng loopback là ngoại lệ duy nhất của "khớp chính xác" (RFC 8252 §7.3) |
 
 | **Bị từ chối** (có phép thử âm) | Mã lỗi |
@@ -534,4 +534,4 @@ Băm mật khẩu Argon2id hiện có của BlueMail: xem `docs/00` D1 (kiểm �
 | Phiên bản | Ngày | Thay đổi |
 |---|---|---|
 | 1.0 | 2026-11-25 | Bản đầu (Phase 0) |
-| 1.1 | 2026-11-25 | Làm rõ (Phase 2, trước khi có sản phẩm nào tích hợp): client assertion phải có `typ: client-authentication+jwt`. Thêm: claim `scope` (RFC 9068) bên cạnh `scp`; ghi rõ claim `oi_*` là nội bộ; giá trị `iss` chính xác là issuer **kèm `/` cuối** như trong discovery (ví dụ `https://id.example.com/`) — sản phẩm luôn lấy issuer từ discovery và so nguyên chuỗi |
+| 1.1 | 2026-11-25 | Làm rõ (Phase 2, trước khi có sản phẩm nào tích hợp): client assertion phải có `typ: client-authentication+jwt`. Thêm: `client_secret_post` tuỳ chọn theo ứng dụng (mặc định tắt); claim `scope` (RFC 9068) bên cạnh `scp`; ghi rõ claim `oi_*` là nội bộ; giá trị `iss` chính xác là issuer **kèm `/` cuối** như trong discovery (ví dụ `https://id.example.com/`) — sản phẩm luôn lấy issuer từ discovery và so nguyên chuỗi |

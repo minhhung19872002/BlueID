@@ -57,6 +57,7 @@ public sealed class BackchannelLogoutSender(IServiceScopeFactory scopes, IHttpCl
     TimeProvider clock, ILogger<BackchannelLogoutSender> log) : BackgroundService
 {
     public const string HttpClientName = "backchannel-logout";
+    private const string PermanentPrefix = "refused HTTP ";
     private static readonly TimeSpan GiveUpAfter = TimeSpan.FromHours(72);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -97,6 +98,12 @@ public sealed class BackchannelLogoutSender(IServiceScopeFactory scopes, IHttpCl
                 d.DeliveredAt = clock.GetUtcNow();
                 d.LastError = null;
             }
+            else if (error.StartsWith(PermanentPrefix, StringComparison.Ordinal))
+            {
+                d.LastError = error;
+                d.Status = DeliveryStatus.Failed;
+                log.LogWarning("Back-channel logout to {ClientId} refused by the receiver: {Error}", d.ClientId, error);
+            }
             else
             {
                 d.LastError = error.Length > 500 ? error[..500] : error;
@@ -127,7 +134,15 @@ public sealed class BackchannelLogoutSender(IServiceScopeFactory scopes, IHttpCl
             using var content = new FormUrlEncodedContent([new KeyValuePair<string, string>("logout_token", token)]);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
             using var res = await client.PostAsync(d.Uri, content, ct);
-            return res.IsSuccessStatusCode ? null : $"HTTP {(int)res.StatusCode}";
+            if (res.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            // 4xx other than 408/429: the receiver refused this token (OIDC Back-Channel Logout 2.8: 400) - retrying
+            // sends the same refusal again.
+            var code = (int)res.StatusCode;
+            return code is >= 400 and < 500 and not 408 and not 429 ? PermanentPrefix + code : "HTTP " + code;
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

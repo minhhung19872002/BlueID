@@ -133,6 +133,52 @@ public sealed class Phase2SessionTests(StackFixture stack)
     }
 
     [Fact]
+    public async Task Logout_redirects_only_with_a_valid_id_token_hint()
+    {
+        var (_, upn) = await NewUserAsync();
+        async Task<string?> LogoutLocation(string? idTokenHint)
+        {
+            var cookie = await stack.CookieOfAsync(upn);
+            using var c = stack.Web.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+            var q = new Dictionary<string, string?> { ["post_logout_redirect_uri"] = "http://app.test/bye", ["state"] = "x", ["id_token_hint"] = idTokenHint };
+            using var req = new HttpRequestMessage(HttpMethod.Get, Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString("/connect/logout", q));
+            req.Headers.Add("Cookie", cookie);
+            return (await c.SendAsync(req)).Headers.Location?.ToString();
+        }
+
+        (await LogoutLocation(null)).Should().Be("/logout", "no hint: nobody vouches for the redirect URI");
+        var t = await oauth.SignInAndGetTokensAsync(await stack.CookieOfAsync(upn));
+        var tampered = t.IdToken![..^4] + (t.IdToken[^4] == 'A' ? "BBBB" : "AAAA");
+        (await LogoutLocation(tampered)).Should().NotStartWith("http://app.test/bye", "a modified hint is no hint");
+        (await LogoutLocation(t.IdToken)).Should().StartWith("http://app.test/bye", "valid hint of t-spa, its registered URI");
+    }
+
+    [Fact]
+    public async Task Refused_or_outdated_logout_deliveries_stop()
+    {
+        await oauth.EnsureClientsAsync();
+        await using var scope = stack.WebScope();
+        var db = scope.ServiceProvider.GetRequiredService<BlueIdDbContext>();
+        var platform = (await db.Tenants.IgnoreQueryFilters().FirstAsync(t => t.Type == TenantType.Platform)).Id;
+        var reg = scope.ServiceProvider.GetRequiredService<ApplicationRegistry>();
+        var def = new ClientDefinition("t-bcl", "BCL test", ApplicationKind.Public, [OAuthHelper.Redirect], [], [GrantTypes.AuthorizationCode], [], ["openid"],
+            BackchannelLogoutUri: StackFixture.SampleUrl + "/does-not-exist");
+        await reg.EnsureClientAsync(platform, def, default);
+        // A delivery the receiver answers with 404 stops at once.
+        db.LogoutDeliveries.Add(new LogoutDelivery { SessionId = Guid.NewGuid(), UserId = Guid.NewGuid(), TenantId = platform, ClientId = "t-bcl",
+            Uri = StackFixture.SampleUrl + "/does-not-exist", Status = DeliveryStatus.Pending, NextAttemptAt = DateTimeOffset.UtcNow.AddMinutes(-1), CreatedAt = DateTimeOffset.UtcNow });
+        // A delivery still waiting when the URI is removed is cancelled.
+        db.LogoutDeliveries.Add(new LogoutDelivery { SessionId = Guid.NewGuid(), UserId = Guid.NewGuid(), TenantId = platform, ClientId = "t-bcl",
+            Uri = StackFixture.SampleUrl + "/does-not-exist", Status = DeliveryStatus.Pending, NextAttemptAt = DateTimeOffset.UtcNow.AddHours(1), CreatedAt = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+        await stack.Web.Services.GetRequiredService<BackchannelLogoutSender>().RunOnceAsync(default);
+        await reg.EnsureClientAsync(platform, def with { BackchannelLogoutUri = null }, default);
+        var rows = await db.LogoutDeliveries.AsNoTracking().Where(x => x.ClientId == "t-bcl").ToListAsync();
+        rows.Should().OnlyContain(r => r.Status == DeliveryStatus.Failed);
+        rows.Select(r => r.LastError).Should().Contain(["refused HTTP 404", "backchannel_logout_uri changed"]);
+    }
+
+    [Fact]
     public async Task Disabling_a_user_stops_refresh_and_tells_the_product()
     {
         var (tenantId, upn) = await NewUserAsync();

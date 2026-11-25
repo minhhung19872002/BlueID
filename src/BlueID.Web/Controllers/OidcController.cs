@@ -45,6 +45,19 @@ public sealed class OidcController(
     public async Task<IActionResult> Authorize(CancellationToken ct)
     {
         var request = HttpContext.GetOpenIddictServerRequest() ?? throw new InvalidOperationException("Not an OpenID Connect request.");
+        if (request.Request is not null)
+        {
+            // OIDC Core 6.1: request objects are not supported; the client gets request_not_supported (BUG-014), delivered
+            // the way it asked. Only response_mode is read from the (unverified) object, and only to choose between the two
+            // supported modes; the redirect URI is the one OpenIddict validated from the outer parameters.
+            if (request.ResponseMode is null && RequestObjectResponseMode(request.Request) is { } mode)
+            {
+                request.ResponseMode = mode;
+            }
+
+            return Fail(Errors.RequestNotSupported, "Request objects are not supported.");
+        }
+
         var app = await db.ClientApplications.IgnoreQueryFilters().FirstOrDefaultAsync(a => a.ClientId == request.ClientId && a.DeletedAt == null, ct);
         if (app is null || !app.Enabled)
         {
@@ -228,6 +241,7 @@ public sealed class OidcController(
             claims[Claims.PreferredUsername] = user.UserPrincipalName;
             AddIf(claims, Claims.GivenName, user.GivenName);
             AddIf(claims, Claims.FamilyName, user.FamilyName);
+            claims[Claims.UpdatedAt] = user.UpdatedAt.ToUnixTimeSeconds();
         }
 
         if (scopes.Contains(Scopes.Profile) || scopes.Contains("bid.locale"))
@@ -251,7 +265,12 @@ public sealed class OidcController(
     [HttpPost("~/connect/logout")]
     public async Task<IActionResult> Logout(CancellationToken ct)
     {
-        // OpenIddict has validated id_token_hint and post_logout_redirect_uri (exact match) before this runs.
+
+        // OpenIddict has checked post_logout_redirect_uri (exact match against some client). Only a valid id_token_hint
+        // tells which client asks; without one (missing, modified, expired) the person stays on BlueID's signed-out page
+        // and is never sent to a URI an attacker chose (BUG-016).
+        var request = HttpContext.GetOpenIddictServerRequest();
+        var hint = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
         var cookie = await HttpContext.AuthenticateAsync(SessionCookie.Scheme);
         if (cookie.Succeeded && Guid.TryParse(cookie.Principal!.FindFirstValue(BidClaims.Session), out var sid))
         {
@@ -259,6 +278,12 @@ public sealed class OidcController(
         }
 
         await HttpContext.SignOutAsync(SessionCookie.Scheme);
+        // Without a hint OpenIddict still hands back an empty principal: only a subject counts.
+        if (hint?.GetClaim(Claims.Subject) is null || string.IsNullOrEmpty(request?.PostLogoutRedirectUri))
+        {
+            return Redirect("/logout");
+        }
+
         return SignOut(new AuthenticationProperties { RedirectUri = "/logout" }, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -344,6 +369,28 @@ public sealed class OidcController(
             .Where(p => !(p.Key == Parameters.Prompt && p.Item2.Length == 0))
             .Select(p => new KeyValuePair<string, Microsoft.Extensions.Primitives.StringValues>(p.Key, p.Item2));
         return "/connect/authorize" + QueryString.Create(pairs);
+    }
+
+    private static string? RequestObjectResponseMode(string jwt)
+    {
+        var parts = jwt.Split('.');
+        if (parts.Length < 2 || parts[1].Length > 16_384)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(Microsoft.IdentityModel.Tokens.Base64UrlEncoder.DecodeBytes(parts[1]));
+            return doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                   doc.RootElement.TryGetProperty(Parameters.ResponseMode, out var m) && m.GetString() is ResponseModes.FormPost or ResponseModes.Query
+                ? m.GetString()
+                : null;
+        }
+        catch (Exception ex) when (ex is FormatException or System.Text.Json.JsonException or ArgumentException)
+        {
+            return null;
+        }
     }
 
     private DateTimeOffset? ReauthTime(string marker)

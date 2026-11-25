@@ -107,6 +107,12 @@ public sealed class OAuthHelper(StackFixture stack)
     /// </summary>
     public static string ErrorOf((HttpStatusCode Status, string? Location, string Body) a)
     {
+        if (a.Location is { } page && page.StartsWith("/oauth-error?", StringComparison.Ordinal))
+        {
+            // BlueID's own error page (the error could not go back to the client).
+            return QueryOf("http://local" + page)["error"];
+        }
+
         if (a.Location is { } loc && Uri.TryCreate(loc, UriKind.Absolute, out _))
         {
             var q = QueryOf(loc);

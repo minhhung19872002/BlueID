@@ -36,6 +36,9 @@ public static class SessionCookie
     public static void AddBlueIdSessionCookie(this IServiceCollection services, bool plainHttpAllowed, bool isApi)
     {
         services.AddDataProtection().SetApplicationName("blueid").PersistKeysToDbContext<BlueIdDbContext>();
+        // The key ring is encrypted at rest with the master key (MasterKey is registered by AddBlueIdOAuthCore).
+        services.AddOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>()
+            .Configure<Infrastructure.Security.MasterKey>((o, master) => o.XmlEncryptor = new Infrastructure.Security.MasterKeyXmlEncryptor(master));
         services.AddAuthentication(Scheme).AddCookie(Scheme, o =>
         {
             // __Host- prefix: Secure, Path=/, no Domain (cannot be set by a sibling subdomain).

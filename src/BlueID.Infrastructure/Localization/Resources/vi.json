@@ -70,5 +70,8 @@
   "error.scope_taken": "Tài nguyên khác đã dùng tên phạm vi này.",
   "error.conformance_mode_off": "Máy khách của bộ kiểm thử tuân thủ chỉ có ở chế độ kiểm thử tuân thủ.",
   "error.redirect_uri_invalid": "Địa chỉ chuyển hướng phải tuyệt đối, không có ký tự đại diện hay fragment.",
-  "error.grant_type_forbidden": "Loại cấp quyền này không được phép."
+  "error.grant_type_forbidden": "Loại cấp quyền này không được phép.",
+  "oauth_error.title": "Yêu cầu đăng nhập không hợp lệ",
+  "oauth_error.text": "Ứng dụng đã chuyển bạn tới đây gửi một yêu cầu mà BlueID không chấp nhận. Hãy quay lại ứng dụng và thử lại; nếu vẫn lỗi, hãy báo quản trị viên của ứng dụng.",
+  "oauth_error.code": "Mã lỗi:"
 }

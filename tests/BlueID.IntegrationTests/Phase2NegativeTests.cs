@@ -39,6 +39,24 @@ public sealed class Phase2NegativeTests(StackFixture stack)
     }
 
     [Fact]
+    public async Task Request_object_is_refused_back_to_the_client()
+    {
+        var cookie = await CookieAsync();
+        var (_, challenge) = OAuthHelper.Pkce();
+        var q = OAuthHelper.CodeRequest("t-spa", "openid", null, challenge);
+        q["request"] = "eyJhbGciOiJub25lIn0.eyJzY29wZSI6Im9wZW5pZCJ9.";
+        var a = await oauth.AuthorizeAsync(cookie, q);
+        a.Location.Should().StartWith(OAuthHelper.Redirect);
+        OAuthHelper.QueryOf(a.Location!)["error"].Should().Be("request_not_supported");
+
+        // response_mode inside the object decides how the error travels (form_post: an auto-submitted form).
+        q["request"] = "eyJhbGciOiJub25lIn0." + Base64UrlEncoder.Encode("""{"response_mode":"form_post","scope":"openid"}""") + ".";
+        var post = await oauth.AuthorizeAsync(cookie, q);
+        post.Status.Should().Be(HttpStatusCode.OK);
+        post.Body.Should().Contain("request_not_supported").And.Contain("method=\"post\"").And.Contain(OAuthHelper.Redirect);
+    }
+
+    [Fact]
     public async Task Password_grant_is_refused()
     {
         await oauth.EnsureClientsAsync();
@@ -80,8 +98,8 @@ public sealed class Phase2NegativeTests(StackFixture stack)
         var cookie = await CookieAsync();
         var (_, challenge) = OAuthHelper.Pkce();
         var a = await oauth.AuthorizeAsync(cookie, OAuthHelper.CodeRequest("t-spa", "openid", null, challenge, redirect: redirect));
-        a.Status.Should().Be(HttpStatusCode.BadRequest);
-        a.Location.Should().BeNull();
+        // Never to the unregistered URI: BlueID's own error page (RFC 6749 3.1.2.4).
+        a.Location.Should().StartWith("/oauth-error?error=");
     }
 
     [Fact]
@@ -100,6 +118,27 @@ public sealed class Phase2NegativeTests(StackFixture stack)
         var second = await oauth.TokenAsync(form);
         second.Error.Should().Be("invalid_grant");
         (await oauth.IntrospectAsync(first.RefreshToken!)).GetProperty("active").GetBoolean().Should().BeFalse("reuse of a code revokes the tokens it issued");
+    }
+
+    [Fact]
+    public async Task Userinfo_answers_401_never_a_redirect()
+    {
+        var cookie = await CookieAsync();
+        var t = await oauth.SignInAndGetTokensAsync(cookie);
+        using var c = stack.Web.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        (await c.GetAsync("/connect/userinfo")).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "no token");
+        c.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "not-a-token");
+        (await c.GetAsync("/connect/userinfo")).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "garbage token");
+        // A revoked token (revocation endpoint) is refused too.
+        using var rv = new HttpRequestMessage(HttpMethod.Post, "/connect/revoke")
+        {
+            Content = new FormUrlEncodedContent([new("token", t.AccessToken!), new("client_id", "t-spa")]),
+        };
+        (await c.SendAsync(rv)).StatusCode.Should().Be(HttpStatusCode.OK);
+        c.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", t.AccessToken);
+        var res = await c.GetAsync("/connect/userinfo");
+        res.StatusCode.Should().Be(HttpStatusCode.Unauthorized, "revoked token");
+        res.Headers.WwwAuthenticate.ToString().Should().Contain("Bearer");
     }
 
     [Fact]
