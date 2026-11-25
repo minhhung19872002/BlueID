@@ -8,7 +8,7 @@ namespace BlueID.Application.Auth;
 public sealed record SessionCheck(bool IsValid, Guid TenantId, Guid UserId, Guid SessionId);
 
 /// <summary>Browser sessions of BlueID (auth.sessions). Every request with a session cookie is checked here.</summary>
-public sealed class SessionService(BlueIdDbContext db, TimeProvider clock)
+public sealed class SessionService(BlueIdDbContext db, OAuth.BackchannelLogoutQueue backchannel, TimeProvider clock)
 {
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromDays(14);
     private static readonly TimeSpan TouchEvery = TimeSpan.FromMinutes(5);
@@ -58,8 +58,23 @@ public sealed class SessionService(BlueIdDbContext db, TimeProvider clock)
         return new SessionCheck(valid, row?.TenantId ?? Guid.Empty, userId, sessionId);
     }
 
-    /// <summary>Ends one session (sign-out). Revocation by an administrator goes through IDirectoryWriter (event).</summary>
-    public Task EndAsync(Guid sessionId, string reason, CancellationToken ct) =>
-        db.Sessions.IgnoreQueryFilters().Where(s => s.Id == sessionId && s.RevokedAt == null)
+    /// <summary>
+    /// Ends one session (sign-out) and queues back-channel logout for the applications that used it. Revocation by an
+    /// administrator goes through IDirectoryWriter (it also raises an event).
+    /// </summary>
+    public async Task EndAsync(Guid sessionId, string reason, CancellationToken ct)
+    {
+        await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(ct) : null;
+        var n = await db.Sessions.IgnoreQueryFilters().Where(s => s.Id == sessionId && s.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, clock.GetUtcNow()).SetProperty(x => x.RevokeReason, reason), ct);
+        if (n > 0)
+        {
+            await backchannel.EnqueueAsync([sessionId], ct);
+        }
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(ct);
+        }
+    }
 }

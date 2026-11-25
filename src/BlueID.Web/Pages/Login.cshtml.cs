@@ -27,13 +27,19 @@ public sealed class LoginModel(SignInService signIn, PendingPasswordChange pendi
     public bool PasswordStep { get; private set; }
     public string? ErrorKey { get; private set; }
 
+    /// <summary>OIDC login_hint passed on by the authorize endpoint: pre-fills the name (it is only a hint).</summary>
+    [BindProperty(SupportsGet = true, Name = "login_hint")]
+    public string? LoginHint { get; set; }
+
     public IActionResult OnGet()
     {
-        if (User.Identity?.IsAuthenticated == true)
+        // A signed-in user coming back from /connect/authorize (prompt=login, max_age) must sign in again; others go on.
+        if (User.Identity?.IsAuthenticated == true && !(ReturnUrl?.StartsWith("/connect/authorize", StringComparison.Ordinal) ?? false))
         {
             return LocalRedirect(SafeReturnUrl());
         }
 
+        UserName ??= LoginHint is { Length: <= 320 } h && Identifiers.TryNormalizeAddress(h, out var hint) ? hint : null;
         return Page();
     }
 

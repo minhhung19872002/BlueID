@@ -54,5 +54,21 @@
   "error.platform_tenant_exists": "The platform organisation already exists.",
   "error.role_already_assigned": "The role is already assigned.",
   "error.conflict": "The change conflicts with existing data.",
-  "error.not_found": "Not found."
+  "error.not_found": "Not found.",
+  "consent.title": "Allow access?",
+  "consent.publisher": "published by",
+  "consent.intro": "This application asks to:",
+  "consent.allow": "Allow",
+  "consent.deny": "Do not allow",
+  "consent.scope.openid": "Sign you in",
+  "consent.scope.profile": "See your name, sign-in name and display settings",
+  "consent.scope.email": "See your email address",
+  "consent.scope.offline_access": "Keep access while you are away",
+  "consent.scope.bid_locale": "See your language, time zone and time format",
+  "error.resource_identifier_invalid": "The resource identifier must be an absolute URI without a fragment.",
+  "error.scope_reserved": "This scope name is reserved.",
+  "error.scope_taken": "Another resource already uses this scope name.",
+  "error.conformance_mode_off": "Conformance-suite clients exist only in conformance mode.",
+  "error.redirect_uri_invalid": "Redirect URIs must be absolute, without wildcards or fragments.",
+  "error.grant_type_forbidden": "This grant type is not allowed."
 }

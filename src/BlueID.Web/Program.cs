@@ -1,6 +1,7 @@
 using System.Net;
 using System.Threading.RateLimiting;
 using BlueID.Application;
+using BlueID.Application.OAuth;
 using BlueID.Application.Seeding;
 using BlueID.Application.Web;
 using BlueID.Infrastructure;
@@ -26,6 +27,11 @@ var plainHttpAllowed = testing || builder.Environment.IsDevelopment();
 builder.AddBlueIdLogging(settings, "web");
 builder.Services.AddBlueIdInfrastructure(settings);
 builder.Services.AddBlueIdApplication();
+builder.Services.AddBlueIdOAuthCore(builder.Configuration);
+var conformanceMode = string.Equals(builder.Configuration["BID_CONFORMANCE_MODE"], "true", StringComparison.OrdinalIgnoreCase);
+builder.Services.AddBlueIdOAuthServer(settings, plainHttpAllowed, conformanceMode,
+    builder.Environment.IsDevelopment() ? builder.Configuration["BID_DEV_HOSTS"] : null);
+builder.Services.AddControllers();
 builder.Services.AddSingleton<IStringLocalizerFactory, JsonStringLocalizerFactory>();
 builder.Services.AddSingleton<IStringLocalizer, JsonStringLocalizer>();
 builder.Services.AddBlueIdSessionCookie(plainHttpAllowed, isApi: false);
@@ -92,6 +98,7 @@ app.MapGet("/", (HttpContext http) => Results.Redirect(http.User.Identity?.IsAut
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 app.MapRazorPages();
+app.MapControllers();
 // The account / admin SPA (web/, built into wwwroot/portal). Client-side routes get its index.html with a fresh
 // style nonce (BUG-005); the SPA asks /me/v1 itself and is sent to /login on 401.
 if (File.Exists(Path.Combine(portalRoot, "index.html")))
@@ -132,11 +139,15 @@ namespace BlueID.Web
             var seeder = sp.GetRequiredService<SampleDataSeeder>();
             var options = new SeedOptions(config["BID_PLATFORM_DOMAIN"] ?? "blue.test", config["BID_PLATFORM_ADMIN_UPN"], config["BID_PLATFORM_ADMIN_PASSWORD"],
                 config["BID_SEED_USER_PASSWORD"]);
+            await sp.GetRequiredService<BlueID.Infrastructure.Security.KeyRing>().EnsureAsync(CancellationToken.None);
             await seeder.SeedPlatformAsync(options, CancellationToken.None);
             if (string.Equals(config["BID_SEED_SAMPLE_DATA"], "true", StringComparison.OrdinalIgnoreCase))
             {
                 await seeder.SeedSampleTenantsAsync(options, CancellationToken.None);
             }
+
+            await sp.GetRequiredService<BlueID.Application.Seeding.OAuthSeeder>().SeedAsync(CancellationToken.None);
+            await sp.GetRequiredService<ApplicationRegistry>().EnforceConformanceModeAsync(CancellationToken.None);
         }
     }
 }

@@ -26,6 +26,12 @@ public sealed class StackFixture : IAsyncLifetime
 
     public WebApplicationFactory<BlueID.Web.PendingPasswordChange> Web { get; private set; } = null!;
     public WebApplicationFactory<BlueID.Api.UserCultureProvider> Api { get; private set; } = null!;
+    public WebApplicationFactory<SampleProduct.RevokedSessions> Sample { get; private set; } = null!;
+    public const string Issuer = "http://id.test/";
+    public const string SampleUrl = "http://sample.test";
+    public const string SampleApi = SampleUrl + "/api";
+    /// <summary>The sample product's private_key_jwt key (generated per run; its public half is registered in BlueID).</summary>
+    public System.Security.Cryptography.RSA SampleKey { get; } = System.Security.Cryptography.RSA.Create(2048);
     public string ConnectionString { get; private set; } = "";
 
     public async Task InitializeAsync()
@@ -43,32 +49,71 @@ public sealed class StackFixture : IAsyncLifetime
         {
             ["ASPNETCORE_ENVIRONMENT"] = "Testing",
             ["BID_DB_CONNECTION"] = ConnectionString,
-            ["BID_ISSUER"] = "http://id.test",
+            ["BID_ISSUER"] = Issuer.TrimEnd('/'),
+            ["BID_MASTER_KEY"] = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
             ["BID_PLATFORM_DOMAIN"] = "platform.test",
             ["BID_PLATFORM_ADMIN_UPN"] = PlatformAdmin,
             ["BID_PLATFORM_ADMIN_PASSWORD"] = PlatformAdminPassword,
             ["BID_SEED_SAMPLE_DATA"] = "true",
             ["BID_SEED_USER_PASSWORD"] = UserPassword,
+            ["BID_RESOURCE_MAIL"] = "https://api.mail.test",
+            ["BID_SAMPLE_URL"] = SampleUrl,
+            ["BID_SAMPLE_JWKS_FILE"] = WriteSampleKeys(),
+            ["SAMPLE_AUTHORITY"] = Issuer,
+            ["SAMPLE_API"] = SampleApi,
+            ["SAMPLE_CLIENT_ID"] = "sample-product",
+            ["SAMPLE_KEY_ID"] = "sample-test",
         };
         foreach (var (k, v) in env)
         {
             Environment.SetEnvironmentVariable(k, v);
         }
 
-        Web = new WebApplicationFactory<BlueID.Web.PendingPasswordChange>().WithWebHostBuilder(b => b.UseEnvironment("Testing"));
+        // BlueID delivers back-channel logout tokens to the sample product's test server.
+        Web = new WebApplicationFactory<BlueID.Web.PendingPasswordChange>().WithWebHostBuilder(b => b.UseEnvironment("Testing")
+            .ConfigureServices(s => s.AddHttpClient(BlueID.Application.OAuth.BackchannelLogoutSender.HttpClientName)
+                .ConfigurePrimaryHttpMessageHandler(() => new ForwardingHandler(() => Sample.Server.CreateHandler()))));
         Api = new WebApplicationFactory<BlueID.Api.UserCultureProvider>().WithWebHostBuilder(b => b.UseEnvironment("Testing"));
         _ = Web.Server; // start: migrate + seed
         _ = Api.Server;
+        Sample = new WebApplicationFactory<SampleProduct.RevokedSessions>().WithWebHostBuilder(b => b.UseEnvironment("Testing")
+            .ConfigureServices(s => s.AddSingleton(new SampleProduct.BackchannelHandlerHolder(Web.Server.CreateHandler()))));
+        _ = Sample.Server;
     }
 
     public async Task DisposeAsync()
     {
+        await Sample.DisposeAsync();
         await Api.DisposeAsync();
         await Web.DisposeAsync();
         await _pg.DisposeAsync();
     }
 
     public AsyncServiceScope WebScope() => Web.Services.CreateAsyncScope();
+
+    private string WriteSampleKeys()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "blueid-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "sample.key.pem"), SampleKey.ExportPkcs8PrivateKeyPem());
+        Environment.SetEnvironmentVariable("SAMPLE_KEY_FILE", Path.Combine(dir, "sample.key.pem"));
+        var p = SampleKey.ExportParameters(false);
+        var jwks = JsonSerializer.Serialize(new { keys = new[] { new { kty = "RSA", use = "sig", alg = "RS256", kid = "sample-test",
+            n = Microsoft.IdentityModel.Tokens.Base64UrlEncoder.Encode(p.Modulus), e = Microsoft.IdentityModel.Tokens.Base64UrlEncoder.Encode(p.Exponent) } } });
+        var path = Path.Combine(dir, "sample.jwks.json");
+        File.WriteAllText(path, jwks);
+        return path;
+    }
+
+    /// <summary>Forwards to a handler created on first use (the target test server starts later).</summary>
+    private sealed class ForwardingHandler(Func<HttpMessageHandler> target) : DelegatingHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            InnerHandler ??= target();
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
 
     /// <summary>Signs in through the Razor pages (anti-forgery and two steps) and returns the session cookie header.</summary>
     public async Task<(HttpStatusCode Status, string? Location, string? Cookie, string Body)> SignInAsync(string user, string password)

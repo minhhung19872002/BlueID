@@ -35,6 +35,10 @@ Mọi gói NuGet/npm và image phải có ở đây trước khi dùng (từ Pha
 | FluentValidation.DependencyInjectionExtensions | 12.2.0 | Apache-2.0 | Validation DI |
 | Serilog.AspNetCore | 10.0.0 | Apache-2.0 | JSON logs |
 | Swashbuckle.AspNetCore | 10.3.1 | MIT | OpenAPI |
+| OpenIddict.AspNetCore | 7.9.0 | Apache-2.0 | Lõi máy chủ OAuth 2.0 / OIDC (đặc tả mục 1) |
+| OpenIddict.EntityFrameworkCore | 7.9.0 | Apache-2.0 | Lưu ứng dụng, uỷ quyền, thẻ của OpenIddict (schema `oauth`) |
+| Microsoft.AspNetCore.Authentication.OpenIdConnect | 10.0.15 | MIT | Chỉ ứng dụng mẫu `samples/SampleProduct` (máy khách OIDC) |
+| Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.15 | MIT | Chỉ ứng dụng mẫu: API kiểm access token như một sản phẩm |
 | Microsoft.NET.Test.Sdk | 18.12.0 | MIT | Tests |
 | xunit | 2.9.3 | Apache-2.0 | Tests |
 | xunit.runner.visualstudio | 3.1.5 | Apache-2.0 | Tests |

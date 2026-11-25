@@ -54,5 +54,21 @@
   "error.platform_tenant_exists": "Tổ chức nền tảng đã tồn tại.",
   "error.role_already_assigned": "Vai trò này đã được gán.",
   "error.conflict": "Thay đổi xung đột với dữ liệu hiện có.",
-  "error.not_found": "Không tìm thấy."
+  "error.not_found": "Không tìm thấy.",
+  "consent.title": "Cho phép truy cập?",
+  "consent.publisher": "của",
+  "consent.intro": "Ứng dụng này xin quyền:",
+  "consent.allow": "Cho phép",
+  "consent.deny": "Không cho phép",
+  "consent.scope.openid": "Đăng nhập bằng tài khoản của bạn",
+  "consent.scope.profile": "Xem tên, tên đăng nhập và cài đặt hiển thị của bạn",
+  "consent.scope.email": "Xem địa chỉ email của bạn",
+  "consent.scope.offline_access": "Giữ quyền truy cập khi bạn không dùng ứng dụng",
+  "consent.scope.bid_locale": "Xem ngôn ngữ, múi giờ và định dạng giờ của bạn",
+  "error.resource_identifier_invalid": "Định danh tài nguyên phải là URI tuyệt đối, không có phần fragment.",
+  "error.scope_reserved": "Tên phạm vi này đã được dành riêng.",
+  "error.scope_taken": "Tài nguyên khác đã dùng tên phạm vi này.",
+  "error.conformance_mode_off": "Máy khách của bộ kiểm thử tuân thủ chỉ có ở chế độ kiểm thử tuân thủ.",
+  "error.redirect_uri_invalid": "Địa chỉ chuyển hướng phải tuyệt đối, không có ký tự đại diện hay fragment.",
+  "error.grant_type_forbidden": "Loại cấp quyền này không được phép."
 }

@@ -68,7 +68,8 @@ public interface IDirectoryWriter
     Task<User> ChangePasswordAsync(Guid tenantId, Guid userId, string newPassword, bool mustChange, string reason, Actor actor, CancellationToken ct);
 }
 
-public sealed class DirectoryWriter(BlueIdDbContext db, AuditWriter audit, PasswordService passwords, TimeProvider clock) : IDirectoryWriter
+public sealed class DirectoryWriter(BlueIdDbContext db, AuditWriter audit, PasswordService passwords, OAuth.BackchannelLogoutQueue backchannel, TimeProvider clock)
+    : IDirectoryWriter
 {
     public async Task<Tenant> CreateTenantAsync(string name, string slug, TenantType type, string defaultLocale, string defaultTimeZone, Actor actor, CancellationToken ct)
     {
@@ -277,8 +278,7 @@ public sealed class DirectoryWriter(BlueIdDbContext db, AuditWriter audit, Passw
             {
                 // A disabled account loses every session at once; products are told by the event (docs/05 7.5).
                 user.SecurityStamp = Guid.NewGuid().ToString("N");
-                await db.Sessions.IgnoreQueryFilters().Where(s => s.UserId == userId && s.RevokedAt == null)
-                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, clock.GetUtcNow()).SetProperty(x => x.RevokeReason, "user_disabled"), ct);
+                await EndSessionsAsync(userId, null, "user_disabled", ct);
             }
 
             await db.SaveChangesAsync(ct);
@@ -306,20 +306,12 @@ public sealed class DirectoryWriter(BlueIdDbContext db, AuditWriter audit, Passw
         var user = await FindUserAsync(tenantId, userId, ct);
         return await InTransactionAsync(async () =>
         {
-            var q = db.Sessions.IgnoreQueryFilters().Where(x => x.UserId == userId && x.TenantId == tenantId && x.RevokedAt == null);
-            if (sessionIds is not null)
-            {
-                q = q.Where(x => sessionIds.Contains(x.Id));
-            }
-
-            var ids = await q.Select(x => x.Id).ToListAsync(ct);
+            var ids = await EndSessionsAsync(userId, sessionIds, reason, ct);
             if (ids.Count == 0)
             {
                 return 0;
             }
 
-            await db.Sessions.IgnoreQueryFilters().Where(x => ids.Contains(x.Id))
-                .ExecuteUpdateAsync(x => x.SetProperty(v => v.RevokedAt, clock.GetUtcNow()).SetProperty(v => v.RevokeReason, reason), ct);
             if (sessionIds is null)
             {
                 // All sessions: the stamp changes so a cookie issued a moment ago cannot slip through.
@@ -353,12 +345,31 @@ public sealed class DirectoryWriter(BlueIdDbContext db, AuditWriter audit, Passw
             await passwords.SetAsync(user, newPassword, mustChange, ct);
             user.SecurityStamp = Guid.NewGuid().ToString("N");
             await db.SaveChangesAsync(ct);
-            await db.Sessions.IgnoreQueryFilters().Where(x => x.UserId == userId && x.RevokedAt == null)
-                .ExecuteUpdateAsync(x => x.SetProperty(v => v.RevokedAt, clock.GetUtcNow()).SetProperty(v => v.RevokeReason, "password_changed"), ct);
+            await EndSessionsAsync(userId, null, "password_changed", ct);
             await ChangeAsync(tenantId, "user", userId, "credentials_changed", new { kind = "password" }, ct, "user.credentials_changed");
             await audit.WriteAsync(Audit(actor, tenantId, "user.password_changed", "user", userId, null, new { reason, mustChange }), ct);
             return user;
         }, ct);
+    }
+
+    /// <summary>Ends sessions of a user (all, or the given ones) and queues back-channel logout for their applications.</summary>
+    private async Task<IReadOnlyList<Guid>> EndSessionsAsync(Guid userId, IReadOnlyList<Guid>? only, string reason, CancellationToken ct)
+    {
+        var q = db.Sessions.IgnoreQueryFilters().Where(x => x.UserId == userId && x.RevokedAt == null);
+        if (only is not null)
+        {
+            q = q.Where(x => only.Contains(x.Id));
+        }
+
+        var ids = await q.Select(x => x.Id).ToListAsync(ct);
+        if (ids.Count > 0)
+        {
+            await db.Sessions.IgnoreQueryFilters().Where(x => ids.Contains(x.Id))
+                .ExecuteUpdateAsync(x => x.SetProperty(v => v.RevokedAt, clock.GetUtcNow()).SetProperty(v => v.RevokeReason, reason), ct);
+            await backchannel.EnqueueAsync(ids, ct);
+        }
+
+        return ids;
     }
 
     private async Task<User> FindUserAsync(Guid tenantId, Guid userId, CancellationToken ct) =>

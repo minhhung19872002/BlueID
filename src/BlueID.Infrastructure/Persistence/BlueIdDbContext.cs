@@ -28,6 +28,13 @@ public sealed class BlueIdDbContext(DbContextOptions<BlueIdDbContext> options, I
     public DbSet<AdminRoleAssignment> AdminRoleAssignments => Set<AdminRoleAssignment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+    public DbSet<SigningKey> SigningKeys => Set<SigningKey>();
+    public DbSet<ApiResource> ApiResources => Set<ApiResource>();
+    public DbSet<ClientApplication> ClientApplications => Set<ClientApplication>();
+    public DbSet<Consent> Consents => Set<Consent>();
+    public DbSet<SessionClient> SessionClients => Set<SessionClient>();
+    public DbSet<LogoutDelivery> LogoutDeliveries => Set<LogoutDelivery>();
+    public DbSet<UsedToken> UsedTokens => Set<UsedToken>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -160,6 +167,78 @@ public sealed class BlueIdDbContext(DbContextOptions<BlueIdDbContext> options, I
             e.HasIndex(x => new { x.TenantId, x.OccurredAt });
         });
         b.Entity<DataProtectionKey>().ToTable("data_protection_keys", "auth");
+
+        b.Entity<SigningKey>(e =>
+        {
+            e.ToTable("signing_keys", "keys");
+            e.Property(x => x.Kid).HasMaxLength(64);
+            e.HasIndex(x => x.Kid).IsUnique().HasDatabaseName("ux_signing_keys_kid");
+            e.Property(x => x.Algorithm).HasMaxLength(16);
+            e.Property(x => x.PublicJwk).HasColumnType("jsonb");
+            e.Property(x => x.Status).UpperEnum().HasMaxLength(16);
+            // One ACTIVE key and at most one NEXT key per algorithm: database rules.
+            e.HasIndex(x => x.Algorithm).IsUnique().HasFilter("status = 'ACTIVE'").HasDatabaseName("ux_signing_keys_one_active");
+            e.HasIndex(x => new { x.Algorithm, x.Status }).IsUnique().HasFilter("status = 'NEXT'").HasDatabaseName("ux_signing_keys_one_next");
+        });
+
+        Owned<ApiResource>(b, "apps", "resources", e =>
+        {
+            e.Property(x => x.Identifier).HasMaxLength(512);
+            e.HasIndex(x => x.Identifier).IsUnique().HasFilter("deleted_at IS NULL").HasDatabaseName("ux_resources_identifier");
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Scopes).HasColumnType("jsonb");
+            e.Property(x => x.AppRoles).HasColumnType("jsonb");
+            e.Property(x => x.LicenseSkus).HasColumnType("jsonb");
+            e.Property(x => x.EventAuth).HasColumnType("jsonb");
+            e.Property(x => x.TokenLifetimeOverrides).HasColumnType("jsonb");
+            e.Property(x => x.GroupClaims).UpperEnum().HasMaxLength(16);
+        });
+        Owned<ClientApplication>(b, "apps", "applications", e =>
+        {
+            e.Property(x => x.ClientId).HasMaxLength(200);
+            e.HasIndex(x => x.ClientId).IsUnique().HasFilter("deleted_at IS NULL").HasDatabaseName("ux_applications_client_id");
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Kind).UpperEnum().HasMaxLength(16);
+            e.Property(x => x.BackchannelLogoutUri).HasMaxLength(2048);
+        });
+        Owned<Consent>(b, "apps", "consents", e =>
+        {
+            e.Property(x => x.Scopes).HasColumnType("jsonb");
+            // One live consent per (tenant, application, user); null user = tenant-wide administrator consent.
+            e.HasIndex(x => new { x.TenantId, x.ApplicationId, x.UserId }).IsUnique()
+                .HasFilter("revoked_at IS NULL AND deleted_at IS NULL").AreNullsDistinct(false).HasDatabaseName("ux_consents_live");
+        });
+        b.Entity<SessionClient>(e =>
+        {
+            e.ToTable("session_clients", "auth");
+            e.HasKey(x => new { x.SessionId, x.ClientId });
+            e.Property(x => x.ClientId).HasMaxLength(200);
+        });
+        b.Entity<LogoutDelivery>(e =>
+        {
+            e.ToTable("logout_deliveries", "auth");
+            e.Property(x => x.Status).UpperEnum().HasMaxLength(16);
+            e.Property(x => x.ClientId).HasMaxLength(200);
+            e.Property(x => x.Uri).HasMaxLength(2048);
+            e.HasIndex(x => new { x.SessionId, x.ClientId }).IsUnique().HasDatabaseName("ux_logout_deliveries_session_client");
+            e.HasIndex(x => new { x.Status, x.NextAttemptAt });
+        });
+
+        b.Entity<UsedToken>(e =>
+        {
+            e.ToTable("used_tokens", "auth");
+            e.HasKey(x => new { x.Kind, x.Value });
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Value).HasMaxLength(512);
+            e.HasIndex(x => x.ExpiresAt);
+        });
+
+        // OpenIddict's own tables (applications, authorizations, scopes, tokens) in their schema (PROMPT 4 oauth.*).
+        b.UseOpenIddict<Guid>();
+        b.Entity<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication<Guid>>().ToTable("applications", "oauth");
+        b.Entity<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization<Guid>>().ToTable("authorizations", "oauth");
+        b.Entity<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreScope<Guid>>().ToTable("scopes", "oauth");
+        b.Entity<OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreToken<Guid>>().ToTable("tokens", "oauth");
     }
 
     /// <summary>A tenant-owned table: schema, closed-by-default tenant filter plus soft-delete filter.</summary>

@@ -1,0 +1,24 @@
+@page "/consent"
+@model ConsentModel
+@{
+    ViewData["Title"] = T["consent.title"].Value;
+}
+<h1 id="page-title">@T["consent.title"]</h1>
+<p><strong><bdi>@Model.App!.Name</bdi></strong>
+    @if (Model.App.Publisher is not null)
+    {
+        <span class="hint">@T["consent.publisher"] <bdi>@Model.App.Publisher</bdi></span>
+    }
+</p>
+<p>@T["consent.intro"]</p>
+<ul class="scopes">
+    @foreach (var p in Model.Permissions)
+    {
+        <li>@(p.Text.StartsWith("consent.scope.", StringComparison.Ordinal) ? T[p.Text].Value : p.Text)</li>
+    }
+</ul>
+<form method="post">
+    <input type="hidden" asp-for="ReturnUrl">
+    <button type="submit" name="decision" value="allow">@T["consent.allow"]</button>
+    <button type="submit" name="decision" value="deny" class="secondary">@T["consent.deny"]</button>
+</form>

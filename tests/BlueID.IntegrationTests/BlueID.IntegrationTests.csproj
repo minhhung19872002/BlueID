@@ -14,5 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BlueID.Web\BlueID.Web.csproj" />
     <ProjectReference Include="..\..\src\BlueID.Api\BlueID.Api.csproj" />
+    <ProjectReference Include="..\..\samples\SampleProduct\SampleProduct.csproj" />
   </ItemGroup>
 </Project>

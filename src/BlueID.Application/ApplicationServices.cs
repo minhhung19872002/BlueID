@@ -21,6 +21,7 @@ public static class ApplicationServices
         services.AddScoped<SignInService>();
         services.AddScoped<PermissionService>();
         services.AddScoped<SampleDataSeeder>();
+        services.AddScoped<OAuthSeeder>();
         return services;
     }
 }

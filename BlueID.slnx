@@ -6,6 +6,9 @@
     <Project Path="src/BlueID.Web/BlueID.Web.csproj" />
     <Project Path="src/BlueID.Api/BlueID.Api.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/SampleProduct/SampleProduct.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/BlueID.UnitTests/BlueID.UnitTests.csproj" />
     <Project Path="tests/BlueID.IntegrationTests/BlueID.IntegrationTests.csproj" />

@@ -1,6 +1,6 @@
 # 05 — Hợp đồng tích hợp BlueID (Integration contract)
 
-**Phiên bản hợp đồng: 1.0** · Ngày: 2026-11-25 · Trạng thái: **đã duyệt** (biên bản: `docs/00` D8)
+**Phiên bản hợp đồng: 1.1** · Ngày: 2026-11-25 · Trạng thái: **đã duyệt** (biên bản: `docs/00` D8)
 
 Đây là **tài liệu duy nhất** một sản phẩm (BlueMail, BlueChat, BlueDrive, BlueOffice, ứng dụng bên thứ ba) cần đọc để
 tích hợp với BlueID. Sản phẩm không đọc mã hay CSDL của BlueID; mọi thứ ở đây là chuẩn mở (OIDC, OAuth 2.0, SCIM, SET)
@@ -35,7 +35,8 @@ Mọi thay đổi hợp đồng đi kèm phép thử hợp đồng (`tests/BlueI
 
 ## 2. Issuer, discovery, endpoint
 
-- **Một issuer cho mỗi bản triển khai**, ví dụ `https://id.example.com` (dev: `https://id.blue.test:54443`). Tenant
+- **Một issuer cho mỗi bản triển khai**, ví dụ `https://id.example.com/` (dev: `https://id.blue.test:54443/`); giá trị
+  chính xác (kèm `/` cuối) là `issuer` trong discovery và là `iss` của mọi thẻ. Tenant
   **không** nằm trong issuer mà trong claim `tid`.
 - Discovery: `{issuer}/.well-known/openid-configuration` (OIDC Discovery 1.0) và
   `{issuer}/.well-known/oauth-authorization-server` (RFC 8414) — cùng nội dung.
@@ -140,8 +141,9 @@ Phạm vi OIDC chuẩn: `openid`, `profile`, `email`, `offline_access` (cấp re
 | Redirect URI không khớp **chính xác** từng ký tự | Không chuyển hướng; trang lỗi của BlueID |
 | Dùng lại mã uỷ quyền | `invalid_grant` + thu hồi mọi thẻ đã cấp từ mã đó |
 
-Chữ ký `private_key_jwt`: `RS256`, `PS256`, `ES256`; `aud` của assertion là **issuer** (cũng chấp nhận URL token endpoint
-trong v1); `jti` dùng một lần trong thời hạn `exp` (tối đa 5 phút).
+Chữ ký `private_key_jwt`: `RS256`, `PS256`, `ES256`; tiêu đề **`typ: client-authentication+jwt`**
+(draft-ietf-oauth-rfc7523bis; assertion `typ: JWT` bị từ chối); `aud` của assertion là **issuer** (cũng chấp nhận URL token
+endpoint trong v1); `jti` dùng **một lần** (dùng lại → `invalid_client`) trong thời hạn `exp` (tối đa 5 phút).
 
 ---
 
@@ -188,6 +190,7 @@ Gói `BlueID.AspNetCore` làm sẵn cả 7 bước (mục 11).
 | `nonce` | ✓ (khi có) | — | string | |
 | `azp`, `client_id` | `azp` | `client_id` | string | Ứng dụng đã xin thẻ |
 | `scp` | — | thẻ người dùng | string (cách nhau dấu cách) | Phạm vi đã cấp, chỉ của tài nguyên `aud` |
+| `scope` | — | ✓ | string (cách nhau dấu cách) | RFC 9068: mọi phạm vi đã cấp (cả phạm vi OIDC) — thêm ở 1.1 |
 | `roles` | ✓ (vai trò của ứng dụng đăng nhập) | ✓ | string[] | Vai trò ứng dụng **của chính tài nguyên `aud`** đã gán cho người dùng/ứng dụng (trực tiếp hoặc qua nhóm) |
 | `lic` | — | ✓ | string[] | Giấy phép của tài nguyên `aud` đã gán cho người dùng, ví dụ `["mail.standard"]` |
 | `groups` | theo `groupClaims` | theo `groupClaims` | string[] | Mã nhóm (bắc cầu qua nhóm lồng); chỉ khi tài nguyên bật |
@@ -201,6 +204,10 @@ Gói `BlueID.AspNetCore` làm sẵn cả 7 bước (mục 11).
 | `zoneinfo` | như trên | như trên | string IANA | Ví dụ `Asia/Ho_Chi_Minh` |
 | `hour_cycle` | như trên | như trên | `h12` \| `h23` | Cài đặt 12/24 giờ chung cho mọi sản phẩm |
 | `ver` | — | ✓ | `"1.0"` | Phiên bản hợp đồng claims của thẻ |
+
+Claim có tiền tố `oi_` (ví dụ `oi_prst`, `oi_au_id`, `oi_tkn_id`) là dữ liệu nội bộ của máy chủ cấp thẻ: sản phẩm **KHÔNG
+ĐƯỢC** dựa vào chúng (có thể đổi hoặc biến mất bất cứ lúc nào, mục 1 quy tắc 1). Ngoài `scp`, access token còn có `scope` theo
+RFC 9068 (mọi phạm vi được cấp, kể cả `openid`…); sản phẩm dùng `scp` hay `scope` đều được.
 
 Ví dụ access token của BlueMail (đã giải mã):
 
@@ -527,3 +534,4 @@ Băm mật khẩu Argon2id hiện có của BlueMail: xem `docs/00` D1 (kiểm �
 | Phiên bản | Ngày | Thay đổi |
 |---|---|---|
 | 1.0 | 2026-11-25 | Bản đầu (Phase 0) |
+| 1.1 | 2026-11-25 | Làm rõ (Phase 2, trước khi có sản phẩm nào tích hợp): client assertion phải có `typ: client-authentication+jwt`. Thêm: claim `scope` (RFC 9068) bên cạnh `scp`; ghi rõ claim `oi_*` là nội bộ; giá trị `iss` chính xác là issuer **kèm `/` cuối** như trong discovery (ví dụ `https://id.example.com/`) — sản phẩm luôn lấy issuer từ discovery và so nguyên chuỗi |

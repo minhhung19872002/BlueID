@@ -1,6 +1,7 @@
 using System.Net;
 using BlueID.Api;
 using BlueID.Application;
+using BlueID.Application.OAuth;
 using BlueID.Application.Web;
 using BlueID.Infrastructure;
 using BlueID.Infrastructure.Configuration;
@@ -20,6 +21,7 @@ var plainHttpAllowed = testing || builder.Environment.IsDevelopment();
 builder.AddBlueIdLogging(settings, "api");
 builder.Services.AddBlueIdInfrastructure(settings);
 builder.Services.AddBlueIdApplication();
+builder.Services.AddBlueIdOAuthCore(builder.Configuration);
 builder.Services.AddBlueIdSessionCookie(plainHttpAllowed, isApi: true);
 builder.Services.AddControllers()
     .AddJsonOptions(o => WebJson.Configure(o.JsonSerializerOptions))
