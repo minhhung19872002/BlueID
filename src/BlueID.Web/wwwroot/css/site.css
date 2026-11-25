@@ -1,0 +1,144 @@
+/* BlueID sign-in pages. Colours are tokens; contrast is WCAG 2.1 AA (>= 4.5:1 for text) in both themes.
+   Logical properties (margin-inline, padding-block…) so RTL languages lay out correctly. */
+:root {
+  --bid-bg: #f3f5f9;
+  --bid-surface: #ffffff;
+  --bid-text: #1b2333;
+  --bid-text-muted: #4a5568;
+  --bid-primary: #0b57d0;
+  --bid-primary-text: #ffffff;
+  --bid-border: #8a94a6;
+  --bid-focus: #0b57d0;
+  --bid-error-bg: #fdecec;
+  --bid-error-text: #8a1c1c;
+  --bid-radius: 8px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bid-bg: #10141c;
+    --bid-surface: #1b2230;
+    --bid-text: #e8ecf3;
+    --bid-text-muted: #b4bccb;
+    --bid-primary: #8ab4f8;
+    --bid-primary-text: #0b1a33;
+    --bid-border: #6b7588;
+    --bid-focus: #8ab4f8;
+    --bid-error-bg: #3b1d1d;
+    --bid-error-text: #ffb4ab;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { font-size: 100%; }
+
+body {
+  margin: 0;
+  min-block-size: 100vh;
+  background: var(--bid-bg);
+  color: var(--bid-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 100vh;
+  padding: 1rem;
+}
+
+.card {
+  inline-size: 100%;
+  max-inline-size: 26rem;
+  background: var(--bid-surface);
+  border-radius: var(--bid-radius);
+  padding: 2rem 1.75rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 8px 24px rgb(0 0 0 / 8%);
+}
+
+.brand { display: flex; align-items: center; gap: 0.5rem; margin-block-end: 1.5rem; }
+
+.logo {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: 6px;
+  background: var(--bid-primary);
+  color: var(--bid-primary-text);
+  font-weight: 700;
+}
+
+.brand-name { font-weight: 600; font-size: 1.125rem; }
+
+h1 { font-size: 1.5rem; margin: 0 0 1rem; font-weight: 600; }
+
+label { display: block; font-weight: 500; margin-block: 1rem 0.25rem; }
+
+input[type="email"], input[type="password"], input[type="text"] {
+  inline-size: 100%;
+  font: inherit;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--bid-border);
+  border-radius: 6px;
+  background: var(--bid-surface);
+  color: var(--bid-text);
+}
+
+input:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 3px solid var(--bid-focus);
+  outline-offset: 2px;
+}
+
+button {
+  display: block;
+  inline-size: 100%;
+  margin-block-start: 1.5rem;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bid-primary);
+  color: var(--bid-primary-text);
+  cursor: pointer;
+  min-block-size: 44px;
+}
+
+a { color: var(--bid-primary); }
+
+.hint { color: var(--bid-text-muted); font-size: 0.875rem; margin: 0.25rem 0 0; }
+
+.who { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; margin: 0 0 0.5rem; overflow-wrap: anywhere; }
+
+.alert {
+  background: var(--bid-error-bg);
+  color: var(--bid-error-text);
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.foot { margin-block-start: 1.5rem; }
+
+.foot nav { display: flex; gap: 1rem; }
+
+.foot a[aria-current="true"] { font-weight: 600; text-decoration: none; color: var(--bid-text); }
+
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .card { padding: 1.5rem 1.25rem; }
+}

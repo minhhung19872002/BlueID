@@ -9,7 +9,7 @@
 
 id.blue.test:54443 {
 	tls internal
-	@api path /directory/* /admin/v1/* /me/v1/* /internal/v1/* /scim/*
+	@api path /directory /directory/* /admin/v1 /admin/v1/* /me/v1 /me/v1/* /internal/v1/* /scim/*
 	handle @api {
 		reverse_proxy host.docker.internal:5091
 	}

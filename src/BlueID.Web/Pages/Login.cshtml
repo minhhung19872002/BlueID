@@ -1,0 +1,34 @@
+@page "/login"
+@model LoginModel
+@{
+    ViewData["Title"] = T["login.title"].Value;
+}
+<h1 id="page-title">@T["login.title"]</h1>
+@if (Model.ErrorKey is not null)
+{
+    <p class="alert" role="alert" id="login-error">@T[Model.ErrorKey]</p>
+}
+@if (!Model.PasswordStep)
+{
+    <form method="post" asp-page-handler="Name" novalidate>
+        <input type="hidden" asp-for="ReturnUrl">
+        <label for="UserName">@T["login.user_name"]</label>
+        <input id="UserName" name="UserName" type="email" value="@Model.UserName" autocomplete="username" autocapitalize="none" spellcheck="false"
+               required autofocus aria-describedby="@(Model.ErrorKey is null ? "name-hint" : "login-error name-hint")">
+        <p class="hint" id="name-hint">@T["login.user_name_hint"]</p>
+        <button type="submit">@T["login.next"]</button>
+    </form>
+}
+else
+{
+    <form method="post" asp-page-handler="Password" novalidate>
+        <input type="hidden" asp-for="ReturnUrl">
+        <input type="hidden" name="UserName" value="@Model.UserName">
+        <p class="who"><span class="sr-only">@T["login.signing_in_as"] </span><bdi>@Model.UserName</bdi>
+            <a href="/login@(string.IsNullOrEmpty(Model.ReturnUrl) ? "" : "?ReturnUrl=" + Uri.EscapeDataString(Model.ReturnUrl))">@T["login.change_user"]</a></p>
+        <label for="Password">@T["login.password"]</label>
+        <input id="Password" name="Password" type="password" autocomplete="current-password" required autofocus
+               aria-describedby="@(Model.ErrorKey is null ? null : "login-error")">
+        <button type="submit">@T["login.sign_in"]</button>
+    </form>
+}

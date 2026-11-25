@@ -26,3 +26,20 @@ Integration contract: `docs/05-hop-dong-tich-hop.md` — any change to claims, e
 - LDAP seed: `python scripts/dev-gen-ldap.py` before the first `up` (generated file is git-ignored).
 - Windows/Git Bash: prefix docker exec with absolute container paths with `MSYS_NO_PATHCONV=1`.
 - BlueMail (reference for conventions and the embedded identity being replaced): `D:\Source\BlueMail`.
+
+## Layout (Phase 1)
+- `src/BlueID.Domain` entities · `Infrastructure` (EF context + migrations, PBKDF2 hasher, Identifiers (NFC/IDNA), audit
+  chain, JSON localiser `Localization/Resources/{en,vi}.json`) · `Application` (MediatR features, `IDirectoryWriter`,
+  PasswordService/SessionService/SignInService, web plumbing, seeder) · `Web` (Razor sign-in, portal host) · `Api`
+  (`/admin/v1`, `/me/v1`). Portal: `web/` (React + AntD), built into `src/BlueID.Web/wwwroot/portal` (git-ignored).
+- Migrations: `dotnet ef migrations add <Name> -p src/BlueID.Infrastructure -s src/BlueID.Infrastructure -o Persistence/Migrations`.
+  Never edit a committed migration. Unique indexes: explicit `ux_` names, mapped in `DirectoryWriter.SaveUniqueAsync`.
+- New endpoint: `[RequirePermission]` or `[SelfGuarded("why")]` (scan test). New error code: `error.<code>` in en+vi.
+  New package: list it in docs/09 with the exact version (test). New setting: only together with the code that reads it.
+- Stop host-run processes before `dotnet build/test` (they lock bin/): PowerShell
+  `Get-CimInstance Win32_Process | ? CommandLine -match 'BlueID\.(Web|Api)' | % { Stop-Process -Id $_.ProcessId -Force }`.
+- Portal through Caddy needs one origin: Playwright with `--host-resolver-rules=MAP id.blue.test 127.0.0.1`.
+- Long heredocs with many quotes break the shell; never write C# `\n` escapes through Python heredocs (they become real
+  newlines). Write scripts to the scratchpad with the Write tool, or use Edit.
+- Production trial: `docker compose -p blueid-trial -f deploy/docker-compose.yml --env-file <trial.env> up -d` with
+  `BID_HTTPS_PORT=58443`, then `python scripts/dev-smoke-login.py https://localhost:58443`; `down -v` and prune images after.

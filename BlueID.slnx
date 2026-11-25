@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BlueID.Domain/BlueID.Domain.csproj" />
+    <Project Path="src/BlueID.Infrastructure/BlueID.Infrastructure.csproj" />
+    <Project Path="src/BlueID.Application/BlueID.Application.csproj" />
+    <Project Path="src/BlueID.Web/BlueID.Web.csproj" />
+    <Project Path="src/BlueID.Api/BlueID.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlueID.UnitTests/BlueID.UnitTests.csproj" />
+    <Project Path="tests/BlueID.IntegrationTests/BlueID.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

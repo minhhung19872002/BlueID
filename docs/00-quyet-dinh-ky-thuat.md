@@ -140,3 +140,58 @@ hợp đồng.
 `deploy/.env.dev`, mật khẩu Keycloak/LDAP/người dùng mẫu, `BID_MASTER_KEY` dev: cố ý commit (chỉ dùng cho tên miền
 `.test`, mạng dev). Repo GitHub `minhhung19872002/BlueID` để **public** → bí mật production **không bao giờ** nằm trong
 repo; production đọc từ biến môi trường của máy chủ (`docs/04`).
+
+## D10. ASP.NET Core Identity: dùng bộ băm, không dùng `UserManager`
+
+**Bối cảnh.** Đặc tả: người dùng/mật khẩu trên ASP.NET Core Identity; nhưng mọi ghi danh bạ phải qua **một**
+`IDirectoryWriter` (mục 11) và mật khẩu nằm ở `auth.passwords` (mục 4, có lịch sử). `UserManager` + store EF của Identity
+ghi thẳng vào bảng người dùng (và bảng `AspNet*`), đi vòng qua cả hai luật.
+
+**Quyết định.** Dùng các abstraction của Identity — `IPasswordHasher<User>` (cài bằng `Pbkdf2PasswordHasher`, D1) và
+`PasswordVerificationResult` (kể cả `SuccessRehashNeeded`) — trong `PasswordService`; người dùng là entity riêng
+`directory.users`. Không có bảng `AspNet*`. Cookie phiên là cookie authentication của ASP.NET Core (D11).
+
+**Hệ quả.** Đổi mật khẩu đi qua `IDirectoryWriter.ChangePasswordAsync` (thu hồi mọi phiên, đổi security stamp, sự kiện
+`user.credentials_changed` trong cùng giao dịch). Phase 3 thêm lịch sử N mật khẩu và danh sách mật khẩu lộ vào
+`PasswordService.Validate`.
+
+## D11. Phiên trình duyệt của BlueID và cổng tài khoản/quản trị
+
+- Cookie `__Host-bid_session` (dev HTTP: `bid_session`): `Secure; HttpOnly; SameSite=Lax; Path=/`, nội dung bảo vệ bằng
+  Data Protection, vòng khoá chung trong `auth.data_protection_keys` (Web và Api cùng đọc; nhiều nút dùng chung).
+- **Mỗi yêu cầu** kiểm lại dòng `auth.sessions` (chưa thu hồi, chưa hết hạn), trạng thái người dùng, trạng thái tenant và
+  security stamp: khoá tài khoản/thu hồi phiên có tác dụng ngay với trang của chính BlueID (phép thử
+  `Disabled_user_cannot_sign_in_and_loses_open_sessions_at_once`). Một truy vấn có chỉ mục; chưa cần bộ đệm.
+- Portal (React) là ứng dụng first-party **cùng origin** với BlueID (Caddy chia đường dẫn: `/me/v1`, `/admin/v1`,
+  `/directory`, `/internal/v1`, `/scim` → Api; còn lại → Web), nên dùng thẳng cookie phiên — đúng mô hình BFF, trình
+  duyệt không cầm thẻ. Chống CSRF cho API: mọi lệnh ghi phải có tiêu đề `X-BlueID-CSRF` (biểu mẫu chéo trang không đặt
+  được; script khác origin cần pre-flight CORS mà BlueID không cho) cộng `SameSite=Lax`. Trang Razor dùng anti-forgery
+  token chuẩn.
+- CSP portal: Ant Design chèn `<style>` lúc chạy → `index.html` của portal được phục vụ kèm **nonce ngẫu nhiên mỗi phản
+  hồi** và `style-src 'self' 'nonce-…'` chỉ cho phản hồi đó; không bao giờ `'unsafe-inline'` (BUG-005).
+
+## D12. Chống dò mật khẩu ở Phase 1
+
+- Khoá mềm theo cặp **(tài khoản, IP)**: 5 lần sai đầu miễn phí, sau đó trễ 2^(n−5) giây, tối đa 15 phút; bộ đếm tăng
+  nguyên tử ở CSDL (`INSERT … ON CONFLICT … RETURNING`, phép thử 6 lần sai song song). Kẻ dò từ IP khác **không** khoá được
+  chủ tài khoản (phép thử `Parallel_wrong_passwords_are_all_counted`).
+- Giới hạn theo IP: 30 lượt POST trang đăng nhập/phút (`RateLimiter`).
+- Thời gian trả lời: mọi nhánh tốn đúng một lần PBKDF2 và có sàn 400 ms (`SignInService.MinimumDuration`), nên truy vấn
+  phụ của nhánh "có tài khoản" không lộ ra; trang trả lời giống hệt nhau (phép thử so sánh HTML).
+- Phase 3 bổ sung: phát hiện dò hàng loạt nhiều tài khoản từ một IP → thử thách thêm; giới hạn theo tài khoản trên mọi IP.
+
+## D13. Enum, chỉ mục và dữ liệu mẫu
+
+- Enum lưu dạng SNAKE_UPPER (`ACTIVE`, `LDAP_SYNC`) — cùng chữ với đặc tả mục 4 và API.
+- Chỉ mục duy nhất đặt tên tường minh (`ux_…`) và luôn có `WHERE deleted_at IS NULL`; tên tự sinh của EF có thể vượt 63
+  ký tự của PostgreSQL. `DirectoryWriter` đổi vi phạm duy nhất thành mã lỗi ổn định theo tên chỉ mục.
+- Dữ liệu mẫu (`BID_SEED_SAMPLE_DATA=true`): tenant nền tảng (`admin@<BID_PLATFORM_DOMAIN>`, buộc đổi mật khẩu lần đầu),
+  `bluemail.test` (en, 40 người) và `acme.test` (vi, 45 người), tên nhiều nước, phòng ban + quản lý, một người bị khoá;
+  quản trị viên `admin@bluemail.test`, `admin@acme.test`.
+
+## Bằng chứng Phase 1 (2026-11-25)
+
+- `dotnet test BlueID.slnx`: 32 unit + 19 tích hợp (PostgreSQL 16 thật qua Testcontainers) xanh; `npx vitest run` 3 xanh.
+- `python scripts/dev-smoke-login.py` (tiến trình dev) và `python scripts/dev-smoke-login.py https://localhost:58443`
+  (image `blueid/server` + `deploy/docker-compose.yml` chạy thật, project `blueid-trial`): **PASS 11/11**, có HSTS, cookie
+  `__Host-`. Ảnh chụp Playwright 1366×768 và 375×812: không cuộn ngang.

@@ -1,0 +1,18 @@
+@page "/logout"
+@model LogoutModel
+@{
+    ViewData["Title"] = T["logout.title"].Value;
+}
+<h1 id="page-title">@T["logout.title"]</h1>
+@if (Model.SignedIn)
+{
+    <p>@T["logout.question"]</p>
+    <form method="post">
+        <button type="submit">@T["logout.submit"]</button>
+    </form>
+}
+else
+{
+    <p>@T["logout.done"]</p>
+    <p><a href="/login">@T["logout.sign_in_again"]</a></p>
+}

@@ -1,0 +1,72 @@
+{
+  "nav": {
+    "main": "Main",
+    "account": "My account",
+    "users": "Users",
+    "tenants": "Tenants",
+    "sign_out": "Sign out"
+  },
+  "common": {
+    "loading": "Loading…",
+    "load_failed": "Could not load the page. Try again.",
+    "save": "Save",
+    "actions": "Actions",
+    "load_more": "Load more",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "account": {
+    "title": "My account",
+    "profile": "Profile",
+    "settings": "Display settings",
+    "language": "Language",
+    "time_zone": "Time zone",
+    "hour_cycle": "Time format",
+    "h23": "24-hour",
+    "h12": "12-hour",
+    "default_value": "Organisation default",
+    "saved": "Settings saved. Every Blue product uses them.",
+    "sessions": "Signed-in browsers"
+  },
+  "session": {
+    "device": "Browser",
+    "ip": "IP address",
+    "last_seen": "Last active",
+    "this_device": "This browser",
+    "sign_out": "Sign out"
+  },
+  "user": {
+    "display_name": "Name",
+    "upn": "Sign-in name",
+    "job_title": "Job title",
+    "department": "Department",
+    "last_sign_in": "Last sign-in",
+    "status": "Status",
+    "status_active": "Active",
+    "status_disabled": "Disabled",
+    "status_deleted": "Deleted"
+  },
+  "users": {
+    "title": "Users",
+    "search": "Search by name or sign-in name",
+    "count_one": "{{count}} user",
+    "count_other": "{{count}} users",
+    "disable": "Disable",
+    "enable": "Enable",
+    "revoke_sessions": "Sign out everywhere",
+    "revoke_confirm": "Sign this user out of every browser and app?",
+    "sessions_revoked_one": "{{count}} session ended",
+    "sessions_revoked_other": "{{count}} sessions ended"
+  },
+  "tenants": {
+    "title": "Tenants",
+    "name": "Name",
+    "slug": "Short name",
+    "type": "Type",
+    "type_platform": "Platform",
+    "type_customer": "Customer",
+    "domains": "Domains",
+    "users": "Users",
+    "locale": "Language"
+  }
+}

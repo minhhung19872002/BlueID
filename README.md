@@ -13,7 +13,8 @@ directory API.
 | Phase | Content | State |
 |---|---|---|
 | 0 | Dev infrastructure, reference systems, integration contract 1.0 | ✅ done |
-| 1 | Foundation: solution, tenants, users, passwords, Razor sign-in, sessions, audit, i18n, React admin shell | next |
+| 1 | Foundation: solution, tenants, users, passwords, Razor sign-in, sessions, audit, i18n, React portal shell | ✅ done |
+| 2 | OAuth/OIDC core (OpenIddict), conformance suite | next |
 
 ## Dev environment (Phase 0)
 
@@ -37,3 +38,18 @@ Add to the hosts file: `127.0.0.1 id.blue.test sample.blue.test idp.doitac.test 
 | PostgreSQL / Valkey | 127.0.0.1:54432 / 127.0.0.1:54379 |
 
 Dev credentials are in `deploy/.env.dev` (dev only, test domains only).
+
+## Run BlueID (Phase 1)
+
+```sh
+cd web && npm ci && npm run build && cd ..      # portal → src/BlueID.Web/wwwroot/portal
+sh scripts/dev-run.sh web                        # migrates + seeds, http://localhost:5090
+sh scripts/dev-run.sh api                        # http://localhost:5091 (start after web)
+python scripts/dev-smoke-login.py                # SMOKE: PASS
+```
+
+Open https://id.blue.test:54443/ (Caddy, internal CA). Sample accounts: `admin@acme.test` (vi) and
+`admin@bluemail.test` (en), password `Sample-User-Pass-2026`; platform `admin@blue.test` / `Platform-Dev-Pass-2026`
+(must change at first sign-in). Tests: `dotnet test BlueID.slnx` (Docker needed), `cd web && npx vitest run`.
+
+Production: `deploy/docker-compose.yml` + `deploy/.env.example`; image `deploy/docker/blueid.Dockerfile`.

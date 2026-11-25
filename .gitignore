@@ -20,3 +20,6 @@ tests/interop/out/
 .claude/settings.local.json
 .env
 deploy/.env
+# portal build output (built in the image and by `npm run build`)
+src/BlueID.Web/wwwroot/portal/
+*.tsbuildinfo

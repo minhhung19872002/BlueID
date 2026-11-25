@@ -1,0 +1,72 @@
+{
+  "nav": {
+    "main": "Chính",
+    "account": "Tài khoản của tôi",
+    "users": "Người dùng",
+    "tenants": "Tổ chức",
+    "sign_out": "Đăng xuất"
+  },
+  "common": {
+    "loading": "Đang tải…",
+    "load_failed": "Không tải được trang. Hãy thử lại.",
+    "save": "Lưu",
+    "actions": "Thao tác",
+    "load_more": "Tải thêm",
+    "yes": "Có",
+    "no": "Không"
+  },
+  "account": {
+    "title": "Tài khoản của tôi",
+    "profile": "Hồ sơ",
+    "settings": "Cài đặt hiển thị",
+    "language": "Ngôn ngữ",
+    "time_zone": "Múi giờ",
+    "hour_cycle": "Định dạng giờ",
+    "h23": "24 giờ",
+    "h12": "12 giờ",
+    "default_value": "Mặc định của tổ chức",
+    "saved": "Đã lưu cài đặt. Mọi sản phẩm Blue đều dùng cài đặt này.",
+    "sessions": "Trình duyệt đang đăng nhập"
+  },
+  "session": {
+    "device": "Trình duyệt",
+    "ip": "Địa chỉ IP",
+    "last_seen": "Hoạt động lần cuối",
+    "this_device": "Trình duyệt này",
+    "sign_out": "Đăng xuất"
+  },
+  "user": {
+    "display_name": "Tên",
+    "upn": "Tên đăng nhập",
+    "job_title": "Chức danh",
+    "department": "Phòng ban",
+    "last_sign_in": "Đăng nhập lần cuối",
+    "status": "Trạng thái",
+    "status_active": "Hoạt động",
+    "status_disabled": "Đã khoá",
+    "status_deleted": "Đã xoá"
+  },
+  "users": {
+    "title": "Người dùng",
+    "search": "Tìm theo tên hoặc tên đăng nhập",
+    "count_one": "{{count}} người dùng",
+    "count_other": "{{count}} người dùng",
+    "disable": "Khoá",
+    "enable": "Mở khoá",
+    "revoke_sessions": "Đăng xuất khỏi mọi nơi",
+    "revoke_confirm": "Đăng xuất người này khỏi mọi trình duyệt và ứng dụng?",
+    "sessions_revoked_one": "Đã kết thúc {{count}} phiên",
+    "sessions_revoked_other": "Đã kết thúc {{count}} phiên"
+  },
+  "tenants": {
+    "title": "Tổ chức",
+    "name": "Tên",
+    "slug": "Tên ngắn",
+    "type": "Loại",
+    "type_platform": "Nền tảng",
+    "type_customer": "Khách hàng",
+    "domains": "Tên miền",
+    "users": "Người dùng",
+    "locale": "Ngôn ngữ"
+  }
+}

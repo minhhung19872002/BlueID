@@ -28,7 +28,8 @@ Mỗi dòng: chuẩn, phase làm, trạng thái, bằng chứng. Trạng thái: 
 | SAML 2.0 SP (Web Browser SSO, Redirect + POST binding) | 9 | ⬜ | Keycloak đối chứng; mẫu XSW1–8 |
 | SCIM 2.0 (RFC 7643, 7644) | 10 | ⬜ | Máy khách SCIM độc lập |
 | SAML 2.0 IdP | 11 | ⬜ | |
-| IDNA2008 / UTS #46, SMTPUTF8 địa chỉ (RFC 6531), Unicode NFC, UTS #39 (đồng hình) | 1, 4 | ⬜ | |
+| IDNA2008 / UTS #46 (A-label, `IdnMapping` trên ICU), địa chỉ UTF-8 (RFC 6531), Unicode NFC | 1 | ✅ | `IdentifierTests` (đối chứng Punycode với bộ mã hoá của Python) |
+| UTS #39 (đồng hình), cảnh báo tên miền trộn hệ chữ | 4 | ⬜ | |
 | Deprecation (RFC 9745), Sunset (RFC 8594) | khi cần | ⬜ | |
 
 **Không hỗ trợ (có phép thử khẳng định bị từ chối):** implicit, hybrid trả thẻ ở front-channel, ROPC.
