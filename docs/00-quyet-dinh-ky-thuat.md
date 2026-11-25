@@ -195,3 +195,28 @@ ghi thẳng vào bảng người dùng (và bảng `AspNet*`), đi vòng qua c�
 - `python scripts/dev-smoke-login.py` (tiến trình dev) và `python scripts/dev-smoke-login.py https://localhost:58443`
   (image `blueid/server` + `deploy/docker-compose.yml` chạy thật, project `blueid-trial`): **PASS 11/11**, có HSTS, cookie
   `__Host-`. Ảnh chụp Playwright 1366×768 và 375×812: không cuộn ngang.
+
+## D14. PKCE bắt buộc và bộ kiểm thử tuân thủ OpenID (quyết định trước Phase 2)
+
+**Bối cảnh.** Đặc tả mục 0 (nguyên tắc 4) và mục 3: PKCE bắt buộc cho **mọi** máy khách, kể cả máy khách bí mật. Đặc tả
+mục 7 và 10: phải **qua** bộ kiểm thử tuân thủ OpenID (Basic OP, Config OP, Form Post OP, RP-Initiated Logout,
+Back-Channel Logout). Đọc mã nguồn bộ kiểm thử `release-v5.3.4` (`.cache/conformance-suite`): các bài OIDCC chuẩn
+**không gửi** `code_challenge`; chỉ bài `oidcc-ensure-request-with-valid-pkce-succeeds` (`OIDCCEnsureRequestWithValidPkceSucceeds.java`)
+gửi PKCE. Bắt PKCE với máy khách của bộ kiểm thử thì gần như mọi bài của hồ sơ Basic/Form Post trượt ở bước authorize.
+
+**Quyết định.** PKCE `S256` vẫn bắt buộc cho mọi máy khách thật. Thêm một ngoại lệ hẹp, có canh:
+
+- Ứng dụng có cờ `conformance_test_client = true` thì không bị bắt PKCE (nhưng gửi PKCE thì vẫn được kiểm đúng, và
+  `plain` vẫn bị từ chối).
+- Cờ này **chỉ tạo được** khi tiến trình chạy với `BID_CONFORMANCE_MODE=true` (chỉ có trong `deploy/.env.dev` và CI),
+  chỉ cho ứng dụng thuộc tenant riêng `conformance` do kịch bản kiểm thử tạo; production không đặt biến này nên không có
+  đường nào tạo ra cờ. Khi khởi động mà không có `BID_CONFORMANCE_MODE=true`, mọi ứng dụng mang cờ bị **tắt** (ghi log
+  cảnh báo, ghi kiểm toán) — một bản sao CSDL dev lọt sang production cũng không mở được lỗ.
+- Mọi phần còn lại của cấu hình khi chạy bộ kiểm thử giống hệt production (cùng image, cùng mã, cùng thời hạn thẻ).
+
+**Bằng chứng phải có ở Phase 2.** (1) Bộ kiểm thử qua cả 5 hồ sơ; (2) phép thử âm: máy khách thường thiếu PKCE →
+`invalid_request`, `plain` → `invalid_request` (kể cả với máy khách của bộ kiểm thử); (3) phép thử: khởi động không có
+`BID_CONFORMANCE_MODE` thì ứng dụng mang cờ bị tắt; (4) phép thử: API quản trị không đặt được cờ.
+
+**Hệ quả.** Chứng nhận/đối chứng là của đúng mã và cấu hình chạy thật, chỉ khác yêu cầu PKCE của riêng máy khách kiểm
+thử — điều mà chính bộ kiểm thử OpenID coi là tuỳ chọn của OIDC. Ghi rõ trong `docs/07` cạnh kết quả chạy.
