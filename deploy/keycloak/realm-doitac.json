@@ -1,0 +1,105 @@
+{
+  "realm": "doitac",
+  "enabled": true,
+  "displayName": "Doi Tac (reference IdP, test only)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "accessTokenLifespan": 300,
+  "users": [
+    {
+      "username": "an.nguyen",
+      "email": "an.nguyen@doitac.test",
+      "emailVerified": true,
+      "firstName": "An",
+      "lastName": "Nguyễn",
+      "enabled": true,
+      "attributes": { "department": ["Kế toán"], "jobTitle": ["Kế toán trưởng"] },
+      "credentials": [{ "type": "password", "value": "Doitac-Dev-Pass-1", "temporary": false }]
+    },
+    {
+      "username": "maria.garcia",
+      "email": "maria.garcia@doitac.test",
+      "emailVerified": true,
+      "firstName": "María",
+      "lastName": "García",
+      "enabled": true,
+      "attributes": { "department": ["Sales"], "jobTitle": ["Account Manager"] },
+      "credentials": [{ "type": "password", "value": "Doitac-Dev-Pass-1", "temporary": false }]
+    },
+    {
+      "username": "kenji.sato",
+      "email": "kenji.sato@doitac.test",
+      "emailVerified": true,
+      "firstName": "Kenji",
+      "lastName": "Sato",
+      "enabled": true,
+      "attributes": { "department": ["Engineering"], "jobTitle": ["Engineer"] },
+      "credentials": [{ "type": "password", "value": "Doitac-Dev-Pass-1", "temporary": false }]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "blueid",
+      "name": "BlueID (OIDC federation, test)",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "keycloak-blueid-dev-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://id.blue.test:54443/federation/oidc/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://id.blue.test:54443/*"
+      },
+      "defaultClientScopes": ["openid", "profile", "email"]
+    },
+    {
+      "clientId": "https://id.blue.test:54443/federation/saml/metadata",
+      "name": "BlueID (SAML SP, test)",
+      "protocol": "saml",
+      "enabled": true,
+      "frontchannelLogout": false,
+      "redirectUris": ["https://id.blue.test:54443/federation/saml/acs"],
+      "attributes": {
+        "saml.assertion.signature": "true",
+        "saml.server.signature": "true",
+        "saml.client.signature": "false",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_name_id_format": "email",
+        "saml.force.name.id.format": "true",
+        "saml_assertion_consumer_url_post": "https://id.blue.test:54443/federation/saml/acs"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": { "user.attribute": "email", "attribute.name": "email", "attribute.nameformat": "Basic" }
+        },
+        {
+          "name": "givenName",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": { "user.attribute": "firstName", "attribute.name": "givenName", "attribute.nameformat": "Basic" }
+        },
+        {
+          "name": "surname",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-property-mapper",
+          "config": { "user.attribute": "lastName", "attribute.name": "surname", "attribute.nameformat": "Basic" }
+        },
+        {
+          "name": "department",
+          "protocol": "saml",
+          "protocolMapper": "saml-user-attribute-mapper",
+          "config": { "user.attribute": "department", "attribute.name": "department", "attribute.nameformat": "Basic" }
+        }
+      ]
+    }
+  ]
+}

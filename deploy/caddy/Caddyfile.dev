@@ -1,0 +1,24 @@
+# Dev TLS front (internal CA). BlueID.Web runs on the host at 5090, BlueID.Api at 5091,
+# the sample product at 5095 (scripts/dev-run.sh).
+{
+	local_certs
+	skip_install_trust
+	https_port 54443
+	http_port 54480
+}
+
+id.blue.test:54443 {
+	tls internal
+	@api path /directory/* /admin/v1/* /me/v1/* /internal/v1/* /scim/*
+	handle @api {
+		reverse_proxy host.docker.internal:5091
+	}
+	handle {
+		reverse_proxy host.docker.internal:5090
+	}
+}
+
+sample.blue.test:54443 {
+	tls internal
+	reverse_proxy host.docker.internal:5095
+}

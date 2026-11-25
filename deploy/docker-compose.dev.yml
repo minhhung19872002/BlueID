@@ -1,0 +1,143 @@
+# BlueID development / test network (PROMPT Phase 0, docs/00 Z1).
+#   docker compose -f deploy/docker-compose.dev.yml --env-file deploy/.env.dev up -d
+# BlueID processes run on the host (scripts/dev-run.sh); Caddy publishes them as https://id.blue.test:54443
+# both to the host browser and to containers (network alias), so the issuer is the same everywhere.
+name: blueid-dev
+
+services:
+  postgres:
+    image: postgres:16.16-alpine
+    command: ["postgres", "-c", "max_connections=300"]
+    shm_size: 256mb
+    environment:
+      POSTGRES_USER: ${BID_DB_USER:?BID_DB_USER is required}
+      POSTGRES_PASSWORD: ${BID_DB_PASSWORD:?BID_DB_PASSWORD is required}
+      POSTGRES_DB: ${BID_DB_NAME:-blueid}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports: ["127.0.0.1:${BID_DEV_PG_PORT:-54432}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+    networks: { bidnet: { ipv4_address: 10.78.0.10 } }
+    restart: unless-stopped
+
+  valkey:
+    image: valkey/valkey:8.1.12-alpine3.24
+    command: ["valkey-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:${BID_DEV_VALKEY_PORT:-54379}:6379"]
+    networks: { bidnet: { ipv4_address: 10.78.0.12 } }
+    restart: unless-stopped
+
+  # Dev mail catcher: password reset mail, invitations, security notices (UI on the host port).
+  mail:
+    image: axllent/mailpit:v1.30.0
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+      MP_MAX_MESSAGES: "5000"
+    ports:
+      - "127.0.0.1:${BID_DEV_MAIL_UI_PORT:-54025}:8025"
+      - "127.0.0.1:${BID_DEV_MAIL_SMTP_PORT:-54026}:1025"
+    networks: { bidnet: { ipv4_address: 10.78.0.13 } }
+    restart: unless-stopped
+
+  # TLS front for the host-run BlueID processes and the sample product (internal CA, dev only).
+  caddy:
+    image: caddy:2.10.2-alpine
+    volumes:
+      - ./caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:${BID_DEV_HTTPS_PORT:-54443}:54443"]
+    networks:
+      bidnet:
+        ipv4_address: 10.78.0.20
+        aliases: [id.blue.test, sample.blue.test]
+    restart: unless-stopped
+
+  # --- test-only: reference SAML 2.0 and OIDC identity provider of a "customer" (realm doitac) ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.7
+    command: ["start-dev", "--import-realm", "--http-port=8080", "--hostname=http://idp.doitac.test:${BID_DEV_KEYCLOAK_PORT:-54080}", "--hostname-backchannel-dynamic=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${BID_KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${BID_KEYCLOAK_ADMIN_PASSWORD:?BID_KEYCLOAK_ADMIN_PASSWORD is required}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-doitac.json:/opt/keycloak/data/import/realm-doitac.json:ro
+    ports: ["127.0.0.1:${BID_DEV_KEYCLOAK_PORT:-54080}:8080"]
+    networks:
+      bidnet:
+        ipv4_address: 10.78.0.30
+        aliases: [idp.doitac.test]
+    restart: unless-stopped
+
+  # --- test-only: customer Active Directory stand-in for BlueID Connect (Phase 10) ---
+  openldap:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service", "--loglevel", "info"]
+    environment:
+      LDAP_ORGANISATION: "Doi Tac"
+      LDAP_DOMAIN: doitac.test
+      LDAP_ADMIN_PASSWORD: ${BID_LDAP_ADMIN_PASSWORD:?BID_LDAP_ADMIN_PASSWORD is required}
+      LDAP_TLS: "false"
+    volumes:
+      - ./dev/openldap/generated:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+      - ldapdata:/var/lib/ldap
+      - ldapconfig:/etc/ldap/slapd.d
+    ports: ["127.0.0.1:${BID_DEV_LDAP_PORT:-54389}:389"]
+    networks: { bidnet: { ipv4_address: 10.78.0.31 } }
+    restart: unless-stopped
+
+  # --- test-only: OpenID Foundation conformance suite (prebuilt images, pinned to the release tag) ---
+  conformance-mongo:
+    image: mongo:6.0.13   # the suite sets FCV 6.0; same pin as its upstream compose
+    volumes: [conformancedb:/data/db]
+    networks: { bidnet: { ipv4_address: 10.78.0.40 } }
+    restart: unless-stopped
+
+  conformance-server:
+    image: registry.gitlab.com/openid/conformance-suite:release-v5.3.4
+    environment:
+      BASE_URL: https://localhost.emobix.co.uk:8443
+      BASE_MTLS_URL: https://localhost.emobix.co.uk:8444
+      MONGODB_HOST: conformance-mongo
+      SPRING_PROFILES_ACTIVE: dev
+      # The OP under test uses Caddy's internal CA: the suite runs in dev mode and does not pin it.
+      JAVA_EXTRA_ARGS: "-Dfintechlabs.devmode=true -Dfintechlabs.startredir=true"
+      # Sign-in to the suite itself is off in dev mode; Spring still requires the registrations to be non-empty.
+      OIDC_GOOGLE_CLIENTID: google-client
+      OIDC_GOOGLE_SECRET: google-secret
+      OIDC_GITLAB_CLIENTID: gitlab-client
+      OIDC_GITLAB_SECRET: gitlab-secret
+    depends_on: [conformance-mongo]
+    networks:
+      bidnet:
+        ipv4_address: 10.78.0.41
+        aliases: [server]   # the suite's nginx config proxies to "server"
+    restart: unless-stopped
+
+  conformance-nginx:
+    image: registry.gitlab.com/openid/conformance-suite/nginx:release-v5.3.4
+    depends_on: [conformance-server]
+    ports: ["127.0.0.1:8443:8443"]
+    networks:
+      bidnet:
+        ipv4_address: 10.78.0.42
+        aliases: [localhost.emobix.co.uk]
+    restart: unless-stopped
+
+networks:
+  bidnet:
+    ipam:
+      config: [{ subnet: 10.78.0.0/24 }]
+
+volumes:
+  pgdata:
+  caddydata:
+  ldapdata:
+  ldapconfig:
+  conformancedb:

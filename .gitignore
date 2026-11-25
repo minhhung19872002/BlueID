@@ -1,0 +1,22 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+.idea/
+logs/
+*.log
+node_modules/
+dist/
+coverage/
+TestResults/
+playwright-report/
+test-results/
+# local caches (conformance-suite checkout used only for its run scripts)
+.cache/
+# generated dev data
+deploy/dev/openldap/generated/
+tests/interop/out/
+.claude/settings.local.json
+.env
+deploy/.env
